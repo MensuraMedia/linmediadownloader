@@ -1,7 +1,7 @@
 # ui/window.py
 """The app window: the kit's dashboard shell (header + status chip + rail + pages)
-with this app's four destinations. Download is the real page; Activity, Library
-and Settings are placeholders until their phases. The window owns the status chip:
+with this app's four destinations: Download, Activity and Library are real pages;
+Settings stays a placeholder until its phase. The window owns the status chip:
 `window.chip.set_status(text, key)` takes the whole sentence and a kit status key
 (the kit's own chip composes "device · word", which cannot say "Reading ·
 the link"), so every chip text the app shows stays in one place: ui/messages.py.
@@ -18,7 +18,9 @@ from lintheme import status  # noqa: E402
 from lintheme.gtk4 import components as kit  # noqa: E402
 from lintheme.gtk4.shell import DashboardWindow  # noqa: E402
 from ui import icons, messages, style  # noqa: E402
+from ui.pages.activity import ActivityPage  # noqa: E402
 from ui.pages.download import DownloadPage  # noqa: E402
+from ui.pages.library import LibraryPage  # noqa: E402
 
 # The app's own icons (rail, cards) must resolve however the window is created
 # (entry point, tests, tools/shot_states.py); registering twice is harmless.
@@ -95,11 +97,10 @@ class MainWindow(DashboardWindow):
         if cancel is not None:
             self.download_page.on_state(lambda state: cancel.set_enabled(state == "downloading"))
         self.add_page("download", messages.PAGE_DOWNLOAD, "download-simple", self.download_page)
-        for page_id, label, icon_name in (
-            ("activity", messages.PAGE_ACTIVITY, "clock-counter-clockwise"),
-            ("library", messages.PAGE_LIBRARY, "music-notes"),
-        ):
-            self.add_page(page_id, label, icon_name, self._placeholder(label, icon_name))
+        self.activity_page = ActivityPage(self)
+        self.add_page("activity", messages.PAGE_ACTIVITY, "clock-counter-clockwise", self.activity_page)
+        self.library_page = LibraryPage(self)
+        self.add_page("library", messages.PAGE_LIBRARY, "music-notes", self.library_page)
         self.add_page(
             "settings",
             messages.PAGE_SETTINGS,
@@ -108,9 +109,36 @@ class MainWindow(DashboardWindow):
             bottom=True,
         )
         self._swap_chip()
+        self._rehome_rail_badges()
         # A narrow header squeezes the chip to ellipses; the word alone still says the state
         self.on_layout(lambda mode: self.chip.set_compact(mode == "compact"))
         self.show_page("download")
+
+    def _rehome_rail_badges(self):
+        """The kit draws the count badge inside the icon's own 24 px overlay, where
+        it lands on the glyph; the mockups pin it to the top right of the whole
+        item, so every badge moves to an overlay around the icon+label column."""
+        for page_id, item in self.rail._items.items():
+            badge = self.rail._badges.get(page_id)
+            if badge is None or not isinstance(badge.get_parent(), Gtk.Overlay):
+                continue
+            icon_overlay = badge.get_parent()
+            column = item.get_child()
+            icon_overlay.remove_overlay(badge)
+            wrap = Gtk.Overlay()
+            item.set_child(wrap)
+            wrap.set_child(column)
+            badge.set_halign(Gtk.Align.END)
+            badge.set_valign(Gtk.Align.START)
+            badge.set_margin_top(2)
+            badge.set_margin_end(2)
+            wrap.add_overlay(badge)
+
+    def show_page(self, page_id):
+        super().show_page(page_id)
+        if page_id == "library":
+            # "Play in Library" lands on the folder of the last download
+            self.library_page.select_by_path(getattr(self.download_page, "_done_folder", ""))
 
     @staticmethod
     def _placeholder(label, icon_name):

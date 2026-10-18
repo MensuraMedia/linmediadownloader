@@ -1,7 +1,7 @@
 # GTK 4 upgrade plan
 
 Status: **approved 2026-10-18**, in progress on `feat/2.0-gtk4` (1.x frozen as tag `v1.0.0`,
-fixes on `release/1.x`). Phases 0–2 done; see the table in section 6.
+fixes on `release/1.x`). Phases 0–4 done; see the table in section 6.
 
 This plan moves Linux Media Downloader from a Flask + PyWebView web UI to a native
 **Python 3 + GTK 4** app styled with the Lin* kit (`lintheme`, theme **Graphite Night**).
@@ -132,8 +132,8 @@ sends commands (enqueue, cancel) through the existing functions. Nothing blocks 
 | 0 Prep **(done)** | Fixed app-data dir (`modules/config/paths.py`, copy-only 1.x migration); download/queue/cancel logic moved from `routes/api.py` to `modules/download/jobs.py`; tests isolated from real data | 92 tests pass; no cwd-relative paths |
 | 1 Kit **(done)** | `lintheme` 1.5.0 vendored (no gtk3) with the new `lintheme/gtk4` (all gtk3 components + shell, async `confirm`, maximize-safe layout modes), `icons.add_icon_dir`; 17 app icons in `resources/`, registered by `ui/icons.py` | 131 tests pass on a display (22 GTK tests skip cleanly without one); CSS parses in GTK 4 with zero errors |
 | 2 Shell + Download **(done)** | `linmediadownloader.py`, `ui/` (app, window, poller, Download page in all states, ring, track list, messages), `modules/download/preview.py`, per-track states; `tools/shot_states.py` renders each state | 165 tests on a display; renders match the mockups; real window opens. Real downloads blocked here by YouTube's bot check (VPN exit IP) until browser sign-in lands |
-| 3 Activity | Queue + history + links merged; one history file with a migration | Old history and links appear |
-| 4 Library | Playlists, all files, tidy-names popover with preview, undo/redo, trash, player | Every 1.0 operation reachable |
+| 3 Activity **(done)** | `ui/pages/activity.py`, `modules/history.py` (merge, group, filter, clear older), `jobs.remove_queued` | Now / Up next / History with search, filters, actions, clear-older confirm; tests on a display |
+| 4 Library **(done)** | `ui/pages/library.py`, `ui/player.py` (GStreamer playbin; videos open in the system player), `ui/widgets/player_bar.py`, `playlists.preview_operation` | Playlists, all files, rename, badge colours, tidy names with preview, undo/redo, trash, player; tests on a display |
 | 5 Settings | Defaults, tidy-name words, tools (version + update), privacy, about, FAQ | Settings persist; no "are you sure" on leave |
 | 6 Packaging | `.deb` deps: `python3-gi gir1.2-gtk-4.0 libgtk-4-media-gstreamer gstreamer1.0-plugins-good librsvg2-common fonts-ubuntu ffmpeg`; drop Flask, pywebview, WebKit2GTK; build `AppDir` from source | Clean install on a fresh Mint 22.3 |
 | 7 Verify | `xvfb-run -a pytest`, headless screenshots of every state, keyboard-only pass, Orca pass, design review against the guide's §14 checklist | All checklist items pass |

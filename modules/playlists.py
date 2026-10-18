@@ -491,6 +491,16 @@ def abbreviate_duplicate_strings(path, keep=4, record=True):
     if not _is_safe_path(path) or not os.path.isdir(path):
         return {'status': 'error', 'message': 'Invalid playlist path'}
 
+    mapper = _abbreviate_mapper(path, keep)
+    if mapper is None:
+        if record:
+            _record([])
+        return {'status': 'success', 'renamed': 0, 'moves': [], **stack_state()}
+    return _rename_within(path, mapper, record=record)
+
+
+def _abbreviate_mapper(path, keep=4):
+    """The abbreviate-duplicates mapper for this folder, or None when nothing recurs"""
     bases = [os.path.splitext(f)[0] for f in _media_files(path)]
 
     # How many files each token appears in (case-insensitive, once per file)
@@ -502,9 +512,7 @@ def abbreviate_duplicate_strings(path, keep=4, record=True):
     # "Duplicate" = recurs in 2+ files and is long enough that abbreviating helps
     common = {tok for tok, count in freq.items() if count >= 2 and len(tok) > keep}
     if not common:
-        if record:
-            _record([])
-        return {'status': 'success', 'renamed': 0, 'moves': [], **stack_state()}
+        return None
 
     def mapper(base, idx):
         parts = re.split(r'([\s_\-]+)', base)  # keeps delimiters at odd indices
@@ -513,7 +521,7 @@ def abbreviate_duplicate_strings(path, keep=4, record=True):
             for i, part in enumerate(parts)
         )
 
-    return _rename_within(path, mapper, record=record)
+    return mapper
 
 
 def is_safe_path(path):
@@ -593,33 +601,91 @@ def apply_operation(path, operation, record=True):
     if operation == 'abbreviate_dupes':
         return abbreviate_duplicate_strings(path, record=record)
 
+    mapper = _mapper_for(path, operation)
+    if mapper is None:
+        return {'status': 'error', 'message': f'Unknown operation: {operation}'}
+    return _rename_within(path, mapper, record=record)
+
+
+# The text mappers shared by apply_operation and preview_operation.
+# Each takes (base_name, file_index) and returns the new base name.
+_RENAME_OPS = {
+    'remove_special': lambda b, i: re.sub(r'[^\w\s.-]', '', b).strip(),
+    'replace_spaces': lambda b, i: re.sub(r'\s+', '_', b.strip()),
+    # Full clean: strip specials, collapse spaces/dashes to underscores.
+    'clean':          lambda b, i: os.path.splitext(sanitize_filename(b + '.x'))[0],
+    'truncate':       lambda b, i: b[:TRUNCATE_LEN].strip(),
+    'remove_filler':  lambda b, i: _remove_filler(b),
+    'apply_replacements': lambda b, i: _apply_replacements(b),
+    'standard_font':  lambda b, i: _to_standard(b),
+    'lower_case':     lambda b, i: b.lower(),
+    'upper_case':     lambda b, i: b.upper(),
+    'title_case':     lambda b, i: _title_case(b),
+    'camel_case':     lambda b, i: _camel_case(b),
+}
+
+
+def _mapper_for(path, operation):
+    """The rename mapper for an operation (number_prefix included), or None"""
+    if operation in _RENAME_OPS:
+        return _RENAME_OPS[operation]
     if operation == 'number_prefix':
-        files = _media_files(path)
-        width = max(2, len(str(len(files))))
-        return _rename_within(
-            path,
-            lambda b, i: f"{str(i + 1).zfill(width)}_{re.sub(r'^[0-9]+[_-]', '', b)}",
-            record=record,
-        )
+        width = max(2, len(str(len(_media_files(path)))))
+        return lambda b, i: f"{str(i + 1).zfill(width)}_{re.sub(r'^[0-9]+[_-]', '', b)}"
+    return None
 
-    rename_ops = {
-        'remove_special': lambda b, i: re.sub(r'[^\w\s.-]', '', b).strip(),
-        'replace_spaces': lambda b, i: re.sub(r'\s+', '_', b.strip()),
-        # Full clean: strip specials, collapse spaces/dashes to underscores.
-        'clean':          lambda b, i: os.path.splitext(sanitize_filename(b + '.x'))[0],
-        'truncate':       lambda b, i: b[:TRUNCATE_LEN].strip(),
-        'remove_filler':  lambda b, i: _remove_filler(b),
-        'apply_replacements': lambda b, i: _apply_replacements(b),
-        'standard_font':  lambda b, i: _to_standard(b),
-        'lower_case':     lambda b, i: b.lower(),
-        'upper_case':     lambda b, i: b.upper(),
-        'title_case':     lambda b, i: _title_case(b),
-        'camel_case':     lambda b, i: _camel_case(b),
-    }
-    if operation in rename_ops:
-        return _rename_within(path, rename_ops[operation], record=record)
 
-    return {'status': 'error', 'message': f'Unknown operation: {operation}'}
+def _planned_unique(new_name, original, taken):
+    """The preview's guess at _unique_name: salt a planned name that collides"""
+    if new_name not in taken:
+        return new_name
+    base, ext = os.path.splitext(new_name)
+    salt = hashlib.md5(original.encode('utf-8', 'ignore')).hexdigest()[:4]
+    candidate = f'{base}_{salt}{ext}'
+    n = 1
+    while candidate in taken:
+        candidate = f'{base}_{salt}{n}{ext}'
+        n += 1
+    return candidate
+
+
+def preview_operation(path, operation):
+    """[(old, new)] for an operation, without touching any file (the Tidy names
+    preview). For delete_long the new name is the file's trash path. The real run
+    may salt a name differently if renames collide mid-run."""
+    if not _is_safe_path(path) or not os.path.isdir(path):
+        return []
+    files = _media_files(path)
+    if operation == 'delete_long':
+        planned = []
+        for name in files:
+            duration = _duration(os.path.join(path, name))
+            if duration is not None and duration > LONG_SECONDS:
+                planned.append((name, os.path.join('.trash', name)))
+        return planned
+    mapper = _abbreviate_mapper(path) if operation == 'abbreviate_dupes' else _mapper_for(path, operation)
+    if mapper is None:
+        return []
+    taken = set(files)
+    planned = []
+    for index, name in enumerate(files):
+        base, ext = os.path.splitext(name)
+        new_name = ((mapper(base, index) or '').strip() or base) + ext
+        if new_name == name:
+            continue
+        new_name = _planned_unique(new_name, name, taken)
+        taken.add(new_name)
+        planned.append((name, new_name))
+    return planned
+
+
+def preview_global(operation):
+    """preview_operation across every app folder (the All files view), as one list"""
+    planned = []
+    for playlist in list_playlists():
+        planned.extend(preview_operation(playlist['path'], operation))
+    return planned
+
 
 
 # ── File Manager (app-recorded files) ────────────────────────────────────────

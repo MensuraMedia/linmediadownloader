@@ -97,6 +97,17 @@ def queue_snapshot():
     return [{k: j.get(k) for k in _QUEUE_FIELDS} for j in list(download_queue)]
 
 
+def remove_queued(job_id):
+    """Drop one waiting job from the queue. Only status 'queued' can be removed
+    (an active download is stopped through cancel_active_download, not here).
+    Returns True when the job was removed."""
+    for job in download_queue:
+        if job.get('id') == job_id and job.get('status') == 'queued':
+            download_queue.remove(job)
+            return True
+    return False
+
+
 def clear_finished_jobs():
     """Drop finished, failed and cancelled jobs from the queue. Returns how many remain."""
     download_queue[:] = [j for j in download_queue if j.get('status') in _UNFINISHED]

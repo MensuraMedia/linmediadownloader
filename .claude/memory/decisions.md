@@ -35,6 +35,24 @@
   queue_snapshot / clear_finished_jobs / normalize_options`; routes only translate HTTP.
 - Impact: modules/download/jobs.py (new), modules/routes/api.py.
 
+### 2026-10-18: Focus ring in the accent blue; status pill shows one word
+- Reason: The user saw yellow borders on fields and buttons (the kit's focus colour #ffd75e, which
+  GTK 4 shows on a focused entry even after a mouse click) and asked for no yellow borders; and
+  asked for the header pill to read only "Ready" / "Downloading".
+- Decision: The app's vendored tokens set focus = accent #4c9dff (contrast still ≥ 3:1 on bg and
+  surface; an app-level departure from the kit's guide, recorded in lintheme/VENDORED.md). The pill
+  shows the first word of each status sentence; the sentence stays as tooltip and accessible name.
+- Impact: lintheme/tokens.py (app copy only), ui/window.py, ui/messages.py.
+
+### 2026-10-18: A track is "done" only after yt-dlp's last post-processing step
+- Reason: The user saw a track reported downloaded while its .webm was still there (conversion to
+  MP3 and the source's deletion run after yt-dlp's download 'finished').
+- Decision: DownloadProgress counts a file and marks it done in a postprocessor hook on
+  'MoveFiles' (MoveFilesAfterDownloadPP), which yt-dlp runs last for every file after conversion,
+  merging and deletion; in between the track is 'processing' ("Converting"). Also fixes 1.x
+  counting a video+audio pair as two files. Verified on a real download.
+- Impact: modules/download/media.py, ui/widgets/track_list.py, ui/pages/download.py, tests.
+
 ### 2026-10-18: YouTube access uses the user's own browser sign-in, found automatically
 - Reason: YouTube answers this machine's NordVPN exit IP with "Sign in to confirm you're not a
   bot"; the 1.x android-client retry was refused too (seen in the first real 2.0 test). The

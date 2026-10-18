@@ -30,7 +30,9 @@ def test_every_message_is_in_the_module():
 
 
 def test_every_message_passes_the_house_rules():
-    breaking = {name: status.problems(text) for name, text in module_strings()}
+    # "UPPER" is the case button that shows its effect in caps, not shouting prose
+    case_samples = {messages.LIB_CASE_UPPER}
+    breaking = {name: status.problems(text) for name, text in module_strings() if text not in case_samples}
     breaking = {name: problems for name, problems in breaking.items() if problems}
     assert breaking == {}
 

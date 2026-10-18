@@ -92,6 +92,10 @@ def icon(icon_name, size=20, color=None, *classes):
     img = Gtk.Image.new_from_paintable(Gdk.Texture.new_for_pixbuf(icons.pixbuf(icon_name, size, color)))
     # GTK 4 draws an Image at the theme's icon size (16 px), not the texture's size
     img.set_pixel_size(size)
+    # ...and scales the texture to fill whatever it is allocated: a FILL-aligned icon in a
+    # 40 px button would be drawn at 40 px. Centred, it keeps its own size.
+    img.set_halign(Gtk.Align.CENTER)
+    img.set_valign(Gtk.Align.CENTER)
     return css(img, *classes)
 
 
@@ -936,5 +940,8 @@ def confirm(
     esc = Gtk.Shortcut.new(Gtk.KeyvalTrigger.new(Gdk.KEY_Escape, 0), Gtk.CallbackAction.new(on_esc))
     keys.add_shortcut(esc)
     dialog.add_controller(keys)
+    # Focus the safe answer first: otherwise a selectable detail label takes focus and
+    # GTK selects all of its text as the dialog opens
+    dialog.set_focus(cancel if destructive else ok)
     dialog.present()
     return dialog

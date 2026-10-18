@@ -108,7 +108,7 @@ def app():
     Gtk.init()  # PyGObject needs it before the first Gtk.Application
     from ui.app import App
 
-    application = App(application_id="org.mensuramedia.LinMediaDownloaderTests")
+    application = App(application_id="org.mensuramedia.LinMediaDownloaderTests." + __name__.rsplit(".", 1)[-1].replace("_", ""))
     application.register(None)  # runs do_startup: the real app actions and accelerators
     return application
 

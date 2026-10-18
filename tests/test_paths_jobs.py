@@ -162,6 +162,15 @@ def test_queue_snapshot_and_clear_finished(fake_queue):
     assert [j['id'] for j in fake_queue] == [2, 3]
 
 
+def test_remove_queued_only_removes_waiting_jobs(fake_queue):
+    fake_queue.extend([{'id': 1, 'status': 'active'}, {'id': 2, 'status': 'queued'},
+                       {'id': 3, 'status': 'queued'}])
+    assert jobs.remove_queued(1) is False  # running: stopped by cancel, not removed
+    assert jobs.remove_queued(99) is False
+    assert jobs.remove_queued(2) is True
+    assert [j['id'] for j in fake_queue] == [1, 3]
+
+
 def test_cancel_records_partial_download(tmp_path, monkeypatch):
     monkeypatch.setattr(settings, 'HISTORY_FILE', str(tmp_path / 'h.json'))
     monkeypatch.setattr(settings, 'download_history', [])

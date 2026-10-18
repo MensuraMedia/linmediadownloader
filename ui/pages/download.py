@@ -638,6 +638,14 @@ class DownloadPage(Gtk.Box):
         self._set_empty()
 
     # -- clipboard
+    def use_link(self, url):
+        """Another page hands the Download page a link (Try again / Use this link)"""
+        if url:
+            self._setting_text = True
+            self.link_entry.set_text(url)
+            self._setting_text = False
+            self.start_read(url)
+
     def _paste_link(self):
         self._paste_into(self.link_entry, then=self._read_now)
 
