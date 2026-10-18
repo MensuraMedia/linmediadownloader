@@ -61,8 +61,9 @@ def setup_logging(level=None):
 class YTDLPLogger:
     """Adapter that routes yt-dlp's internal messages into our logger."""
 
-    def __init__(self, logger=None):
+    def __init__(self, logger=None, on_error=None):
         self._log = logger or logging.getLogger('lmd.ytdlp')
+        self._on_error = on_error  # called with each error line (the download records them)
 
     def debug(self, msg):
         # yt-dlp sends both debug and info lines to debug(); '[debug]'-prefixed
@@ -80,3 +81,5 @@ class YTDLPLogger:
 
     def error(self, msg):
         self._log.error(msg)
+        if self._on_error:
+            self._on_error(msg)

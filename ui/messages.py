@@ -24,6 +24,12 @@ CHIP_TOOLS_NO_FFMPEG = "Needs you · ffmpeg is missing"
 CHIP_READING = "Busy · reading the link"
 CHIP_DOWNLOADING = "Busy · downloading {i} of {M}"
 CHIP_CANT_REACH = "Can't reach · {site}"
+# Finished with nothing saved (every track failed): never shown as a success
+DONE_NOTHING = "Nothing was downloaded"
+AB_NOTHING = "Nothing was downloaded · {time}"
+AB_NOTHING_NO_TIME = "Nothing was downloaded"
+RING_A11Y_NOTHING = "Nothing was downloaded"
+RETRY_DOWNLOAD = "Try again"
 SITE_FALLBACK = "the site"
 
 # -- Link card ------------------------------------------------------------------

@@ -245,7 +245,7 @@ def test_download_runs_and_finishes(page, monkeypatch, tmp_path):
 
     snaps["current"] = done_snapshot()
     wait_until(lambda: page.state == "done")
-    assert "Downloaded 2 tracks" in page.actionbar._done_head.get_text()
+    assert "Downloaded 2 tracks" in page.actionbar._head.get_text()
     assert messages.OPEN_FOLDER in button_label(page.primary_btn)
     counts = page.track_list.counts()
     assert counts["done"] == 2 and counts["skip"] == 2
@@ -439,8 +439,52 @@ def test_counts_agree_when_the_download_finds_more_duplicates(page, monkeypatch)
 
     snap.update(status="completed", current_file="", message="Download completed")
     wait_until(lambda: page.state == "done")
-    assert "Downloaded 1 track" in page.actionbar._done_head.get_text()
-    assert "did not finish" not in page.actionbar._done_detail.get_text()
-    assert "Skipped 2 you already have and 1 over 7 min" in page.actionbar._done_detail.get_text()
+    assert "Downloaded 1 track" in page.actionbar._head.get_text()
+    assert "did not finish" not in page.actionbar._detail.get_text()
+    assert "Skipped 2 you already have and 1 over 7 min" in page.actionbar._detail.get_text()
     assert page.done_ring._complete is True  # the end moment: full ring with the check
     assert accessible_name(page.done_ring) == "All 1 files downloaded"
+
+
+def test_nothing_downloaded_is_not_shown_as_success(page, monkeypatch):
+    """Every track failed (YouTube's bot check): attention ring with a dash, the reason, Try again"""
+    read_link(page, monkeypatch)
+    wait_until(lambda: page.state == "ready")
+    snaps = {"current": active_snapshot()}
+    submits = []
+    monkeypatch.setattr(
+        jobs,
+        "submit_download",
+        lambda url, options: submits.append(url) or {"status": "started", "job_id": 9},
+    )
+    monkeypatch.setattr(jobs, "status_snapshot", lambda: snaps["current"])
+    page.start_download()
+    wait_until(lambda: page.state == "downloading")
+    failed = active_snapshot({})
+    failed.update(
+        status="completed_with_errors",
+        completed_files=0,
+        current_file="",
+        errors=["ERROR: [youtube] x: Sign in to confirm you\u2019re not a bot."],
+    )
+    snaps["current"] = failed
+    wait_until(lambda: page.state == "done")
+    assert page.done_ring._nothing and not page.done_ring._complete
+    assert page.done_headline.get_text() == messages.DONE_NOTHING
+    assert page.done_stats.get_text() == messages.ERRORS["bot_check"]["title"]
+    assert not page.done_play.get_visible()
+    assert page.actionbar.state() == "idle"  # no success tick in the bar
+    assert page.actionbar._head.get_text().startswith(messages.DONE_NOTHING)
+    assert messages.RETRY_DOWNLOAD in button_label(page.primary_btn)
+    assert "Can't reach" in window_chip_text(page)
+    snaps["current"] = active_snapshot()
+    page.primary_btn.emit("clicked")  # Try again runs the same download
+    wait_until(lambda: page.state == "downloading")
+    assert len(submits) == 2
+
+
+def test_paste_buttons_keep_their_width(page):
+    assert page.link_entry.get_hexpand()
+    for entry in (page.link_entry, page.queue_entry, page.another_entry):
+        paste = entry.get_next_sibling()
+        assert not paste.get_hexpand() and not paste.compute_expand(0)

@@ -127,6 +127,13 @@ def set_track(info_dict, state, progress=None):
         entry['progress'] = progress
 
 
+def record_error(message):
+    """Keep yt-dlp's error lines (the last 20) so a front end can say why tracks failed"""
+    errors = current_download.setdefault('errors', [])
+    errors.append(str(message))
+    del errors[:-20]
+
+
 class DownloadProgress:
     """Progress callback for YT-DLP"""
     def __init__(self, total_files=1, split_pending=False):
@@ -259,6 +266,7 @@ def download_media(url, output_dir, download_type='audio', playlist_mode='single
     current_download['current_file'] = ''
     current_download['skipped_duplicates'] = 0
     current_download['tracks'] = {}   # per-track state for the 2.0 track list (see set_track)
+    current_download['errors'] = []   # yt-dlp error lines, newest last (see record_error)
     
     # Get video info to check if it's a playlist
     info = get_video_info(url)
@@ -329,7 +337,7 @@ def download_media(url, output_dir, download_type='audio', playlist_mode='single
         'no_warnings': True,
         'geo_bypass': True,
         'extractor_retries': 5,
-        'logger': YTDLPLogger(logging.getLogger('lmd.ytdlp.dl')),
+        'logger': YTDLPLogger(logging.getLogger('lmd.ytdlp.dl'), on_error=record_error),
     }
 
     # Optional filters: skip long tracks (>7 min) and/or already-downloaded ones.

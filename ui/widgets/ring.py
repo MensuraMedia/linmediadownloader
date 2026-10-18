@@ -44,12 +44,13 @@ class ProgressRing(Gtk.DrawingArea):
         self._done_count = 0
         self._total = 0
         self._complete = False
+        self._nothing = False
         name(self, messages.RING_A11Y_DONE.format(total=0))
 
     def set_progress(self, fraction, done_count, total):
         """Advance the arc; `done_count` of `total` files finished (words shown in the middle)."""
         self._fraction = max(0.0, min(1.0, fraction or 0.0))
-        self._done_count, self._total, self._complete = done_count, total, False
+        self._done_count, self._total, self._complete, self._nothing = done_count, total, False, False
         name(
             self,
             messages.RING_A11Y_PROGRESS.format(
@@ -61,7 +62,14 @@ class ProgressRing(Gtk.DrawingArea):
     def set_complete(self, total):
         """All files downloaded: full ring in the ok colour with a check."""
         self._fraction, self._done_count, self._total, self._complete = 1.0, total, total, True
+        self._nothing = False
         name(self, messages.RING_A11Y_DONE.format(total=total))
+        self.queue_draw()
+
+    def set_nothing(self):
+        """Nothing was downloaded: full ring in the attention colour with a dash, never a check"""
+        self._fraction, self._done_count, self._complete, self._nothing = 0.0, 0, False, True
+        name(self, messages.RING_A11Y_NOTHING)
         self.queue_draw()
 
     # -- drawing
@@ -69,6 +77,16 @@ class ProgressRing(Gtk.DrawingArea):
         cx = cy = SIZE / 2
         cr.set_line_width(STROKE)
         cr.set_line_cap(cairo.LINE_CAP_ROUND)
+        if self._nothing:
+            cr.set_source_rgb(*_rgb(C["attention"]))
+            cr.new_sub_path()
+            cr.arc(cx, cy, RADIUS, 0, 2 * math.pi)
+            cr.stroke()
+            cr.set_line_width(10)
+            cr.move_to(cx - 26, cy)
+            cr.line_to(cx + 26, cy)
+            cr.stroke()
+            return
         if self._complete:
             cr.set_source_rgb(*_rgb(C["ok"]))
             cr.new_sub_path()

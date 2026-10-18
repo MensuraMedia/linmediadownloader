@@ -289,7 +289,7 @@ class DownloadPage(Gtk.Box):
         self.link_entry.connect("changed", self._on_link_changed)
         self.link_entry.connect("activate", lambda *_a: self._read_now())
         paste = kit.button(messages.PASTE, on_click=self._paste_link, icon_name="clipboard-text")
-        self.link_card.add_row(kit.hbox(self.link_entry, paste, expand_last=True))
+        self.link_card.add_row(kit.hbox(self.link_entry, paste))
         self.link_status = Gtk.Box(spacing=8)
         self.link_card.add_row(self.link_status)
         box.append(self.link_card)
@@ -425,7 +425,7 @@ class DownloadPage(Gtk.Box):
         )
         self.queue_entry.set_hexpand(True)
         queue_paste = kit.button(messages.PASTE, on_click=self._paste_queue, icon_name="clipboard-text")
-        self.queue_card.add_row(kit.hbox(self.queue_entry, queue_paste, expand_last=True))
+        self.queue_card.add_row(kit.hbox(self.queue_entry, queue_paste))
         self.queue_message = kit.text("", "lt-caption")
         self.queue_card.add_row(self.queue_message)
         self.queue_card.add_row(kit.button(messages.ADD_TO_QUEUE, on_click=self._add_to_queue))
@@ -451,7 +451,8 @@ class DownloadPage(Gtk.Box):
         self.done_headline.set_halign(Gtk.Align.CENTER)
         self.done_stats = kit.text("", "lt-muted")
         self.done_stats.set_halign(Gtk.Align.CENTER)
-        play = kit.button(
+        self.link_entry.set_hexpand(True)  # Paste buttons keep their natural width
+        play = self.done_play = kit.button(
             messages.PLAY_IN_LIBRARY,
             on_click=lambda: self.window.show_page("library"),
             icon_name="play",
@@ -484,7 +485,7 @@ class DownloadPage(Gtk.Box):
             on_click=lambda: self._paste_into(self.another_entry),
             icon_name="clipboard-text",
         )
-        self.another_card.add_row(kit.hbox(self.another_entry, another_paste, expand_last=True))
+        self.another_card.add_row(kit.hbox(self.another_entry, another_paste))
         self.another_note = kit.text("", "lt-caption")
         self.another_card.add_row(self.another_note)
         box.append(self.another_card)
@@ -1087,9 +1088,18 @@ class DownloadPage(Gtk.Box):
         word = messages.WORD_TRACK if done == 1 else messages.WORD_TRACKS
         self._set_this_skipping(counts["dupes"], counts["long"])  # the final view, not the last poll
         self.done_title.set_text(snap.get("playlist_title") or meta.get("title") or "")
-        self.done_ring.set_complete(done)  # the end moment: full ring and check, always
-        self.done_headline.set_text(messages.DONE_TRACKS.format(n=done, word=word))
-        if size and elapsed:
+        self._nothing_saved = done == 0
+        reason = self._failure_reason(snap) if self._nothing_saved else None
+        if self._nothing_saved:  # never dress a failure up as a success
+            self.done_ring.set_nothing()
+            self.done_headline.set_text(messages.DONE_NOTHING)
+        else:
+            self.done_ring.set_complete(done)  # the end moment: full ring and check
+            self.done_headline.set_text(messages.DONE_TRACKS.format(n=done, word=word))
+        self.done_play.set_visible(not self._nothing_saved)
+        if reason:
+            self.done_stats.set_text(reason["title"])
+        elif size and elapsed:
             self.done_stats.set_text(messages.DONE_STATS.format(size=size, time=elapsed))
         elif elapsed:
             self.done_stats.set_text(messages.DONE_STATS_TIME.format(time=elapsed))
@@ -1112,17 +1122,43 @@ class DownloadPage(Gtk.Box):
         self._apply_state()
         folder = options.get("output_dir") or snap.get("output_path") or ""
         self._done_folder = folder
-        head = (
-            messages.AB_DONE.format(n=done, word=word, folder=tilde(folder), time=elapsed)
-            if elapsed
-            else messages.AB_DONE_NO_TIME.format(n=done, word=word, folder=tilde(folder))
-        )
-        self.actionbar.done(head, self._done_caption(counts, missing))
-        self.window.reset_chip()
+        if self._nothing_saved:
+            head = messages.AB_NOTHING.format(time=elapsed) if elapsed else messages.AB_NOTHING_NO_TIME
+            caption = reason["body"] if reason else self._done_caption(counts, missing)
+            if reason and reason["kind"] in ("bot_check", "rate_limited", "network"):
+                site = site_name(meta.get("url"))
+                self.window.set_chip(messages.CHIP_CANT_REACH.format(site=site), "error")
+            else:
+                self.window.reset_chip()
+        else:
+            head = (
+                messages.AB_DONE.format(n=done, word=word, folder=tilde(folder), time=elapsed)
+                if elapsed
+                else messages.AB_DONE_NO_TIME.format(n=done, word=word, folder=tilde(folder))
+            )
+            caption = self._done_caption(counts, missing)
+            self.window.reset_chip()
+        # the plain two-line layout: the ring above already shows the result
+        self.actionbar.idle(head, caption)
         self._update_badge(snap)
         if self.get_mapped():
             self.another_entry.grab_focus()
         logger.info("download finished: %d done, %d missing", done, missing)
+
+    @staticmethod
+    def _failure_reason(snap):
+        """The plain-words reason for the newest yt-dlp error of this download, or None"""
+        errors = snap.get("errors") or []
+        if not errors:
+            return None
+        kind = preview.classify_error(errors[-1])
+        copy = messages.ERRORS.get(kind) or messages.ERRORS["unknown"]
+        return {"kind": kind, "title": copy["title"], "body": copy["body"]}
+
+    def _retry_download(self):
+        """Run the same download again (after switching VPN server, for example)"""
+        self._return_to_ready()
+        self.start_download()
 
     @staticmethod
     def _done_caption(counts, missing):
@@ -1333,9 +1369,9 @@ class DownloadPage(Gtk.Box):
     def _set_pane_counts(self, words):
         self.pane_counts.set_text(words)
         self.strip_counts.set_text(words)
-        self.pane_title.set_text(
-            messages.TRACKS if self.state in ("downloading", "done") else messages.PREVIEW
-        )
+        tracks_view = self.state in ("downloading", "done")
+        self.pane_title.set_text("" if tracks_view else messages.PREVIEW)
+        self.pane_title.set_visible(not tracks_view)  # the track list explains itself
         self.strip_title.set_text(messages.PREVIEW)
 
     # -- the action bar
@@ -1382,6 +1418,15 @@ class DownloadPage(Gtk.Box):
                 messages.CANCEL_HINT,
                 big=True,
                 on_click=self.cancel_running_download,
+            )
+        elif self.state == "done" and getattr(self, "_nothing_saved", False):
+            self.primary_btn = button_with_icon_hint(
+                messages.RETRY_DOWNLOAD,
+                "arrow-clockwise",
+                None,
+                kind="primary",
+                big=True,
+                on_click=self._retry_download,
             )
         elif self.state == "done":
             self.primary_btn = button_with_icon_hint(
