@@ -33,7 +33,7 @@ PREVIEW_PILLS = {
     "skip_long": ("clock-counter-clockwise", messages.PILL_LONG, "attention", True),
 }
 ACTIVE_PILLS = {
-    "done": ("check-circle", messages.PILL_DONE, "ok", False),
+    "done": (None, messages.PILL_DONE, "ok", False),  # the green pill and word say it (user)
     "downloading": ("circle-notch", messages.PILL_DOWNLOADING, "busy", False),
     "processing": ("circle-notch", messages.PILL_CONVERTING, "busy", False),
     "skip_duplicate": ("copy", messages.PILL_SKIP_HAVE, None, True),

@@ -1305,6 +1305,7 @@ class DownloadPage(Gtk.Box):
             else:
                 self.window.reset_chip()
         else:
+            folder = self._saved_folder() or folder  # where the files are: a playlist's own folder
             head = (
                 messages.AB_DONE.format(n=done, word=word, folder=tilde(folder), time=elapsed)
                 if elapsed
@@ -1336,6 +1337,16 @@ class DownloadPage(Gtk.Box):
             messages.ACCESS_SIGNED_IN.format(browser=browser) if browser else messages.ACCESS_NONE
         )
         self.access_note.set_visible(True)
+
+    def _saved_folder(self):
+        """The folder that holds this download's saved files (their common folder)"""
+        folders = [os.path.dirname(path) for path in self._done_files if path]
+        if not folders:
+            return ""
+        try:
+            return os.path.commonpath(folders)
+        except ValueError:
+            return folders[0]
 
     def _show_done_file(self):
         """Open the folder with the saved file selected (the first, for a playlist)"""
@@ -1652,7 +1663,8 @@ class DownloadPage(Gtk.Box):
             self.actionbar.add_action(self.primary_btn)
 
     def open_done_folder(self):
-        folder = self._done_folder or self.folder
+        """Open the folder the files went into: a playlist's own folder, not the base folder"""
+        folder = self._saved_folder() or self._done_folder or self.folder
         try:
             result = file_utils.open_folder(folder)
         except Exception:

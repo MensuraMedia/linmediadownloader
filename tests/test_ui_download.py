@@ -579,3 +579,21 @@ def test_typing_in_download_another_reads_it_too(page, monkeypatch):
     page.another_entry.set_text(URL)  # the same link again, typed or Ctrl+V
     wait_until(lambda: page.state == "ready", timeout=5)
     assert calls.count(URL) == 2 and messages.DOWNLOAD in button_label(page.primary_btn)
+
+
+def test_open_folder_goes_to_the_playlist_folder(page, monkeypatch, tmp_path):
+    """Open folder opens the folder the files went into, not the base download folder"""
+    opened = []
+    monkeypatch.setattr(download_module.file_utils, "open_folder", opened.append)
+    playlist = tmp_path / "Base" / "Classics_playlist"
+    page._done_folder = str(tmp_path / "Base")
+    page._done_files = [str(playlist / "1.mp3"), str(playlist / "2.mp3")]
+    page.open_done_folder()
+    assert opened == [str(playlist)]
+
+
+def test_done_pill_has_no_icon():
+    """The green pill and its word are enough (user, 2026-10-18)"""
+    from ui.widgets import track_list
+
+    assert track_list.ACTIVE_PILLS["done"][0] is None
