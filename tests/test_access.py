@@ -128,11 +128,10 @@ def test_ydl_options_and_off_switch(tmp_path, monkeypatch):
     monkeypatch.setattr(access, "find_js_runtime", lambda home=None: {"node": {"path": "/x/node"}})
     monkeypatch.setenv("XDG_RUNTIME_DIR", str(tmp_path / "run"))  # never the real /run/user
     opts = access.current(refresh=True).ydl_options()
-    merged = str(tmp_path / "run" / "linmediadownloader" / "cookies")
-    assert opts == {
-        "cookiesfrombrowser": ("firefox", merged, None, None),  # a merged copy, not the live profile
-        "js_runtimes": {"node": {"path": "/x/node"}},
-    }
+    browser, merged, keyring, container = opts["cookiesfrombrowser"]
+    session = str(tmp_path / "run" / "linmediadownloader" / f"session-{os.getpid()}")
+    assert browser == "firefox" and merged.startswith(session + os.sep)  # a merged copy, this process's own
+    assert opts["js_runtimes"] == {"node": {"path": "/x/node"}}
     assert os.path.isfile(os.path.join(merged, "cookies.sqlite")) and path != merged
     assert access.current().describe() == {"browser": "LibreWolf", "js_runtime": "node"}
     monkeypatch.setenv("LMD_BROWSER_ACCESS", "off")
@@ -191,3 +190,20 @@ def test_merged_copy_includes_cookies_still_in_the_wal(tmp_path, monkeypatch):
     assert rows == [("LOGIN_INFO",)]
     assert oct(os.stat(merged).st_mode & 0o777) == "0o700"
     con.close()
+
+
+def test_each_call_gets_its_own_copy_and_dead_sessions_are_cleaned(tmp_path, monkeypatch):
+    """A live download's copy must survive other calls and other processes ending"""
+    monkeypatch.setenv("XDG_RUNTIME_DIR", str(tmp_path / "run"))
+    profile = tmp_path / "profile"
+    profile.mkdir()
+    sqlite3.connect(profile / "cookies.sqlite").execute("CREATE TABLE moz_cookies (name TEXT)").connection.commit()
+    base = tmp_path / "run" / "linmediadownloader"
+    dead = base / "session-999999999" / "cookies-x"  # a process that has ended
+    dead.mkdir(parents=True)
+    first = access.merged_firefox_profile(str(profile))
+    second = access.merged_firefox_profile(str(profile))
+    assert first != second and os.path.isdir(first) and os.path.isdir(second)
+    assert not dead.exists()  # leftovers of finished processes go
+    access._remove_private_copy()  # this process exits: only its own folder is removed
+    assert not os.path.exists(first) and base.exists()

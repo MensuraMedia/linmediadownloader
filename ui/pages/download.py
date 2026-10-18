@@ -1564,7 +1564,12 @@ class DownloadPage(Gtk.Box):
         self.strip_counts.set_text(words)
         tracks_view = self.state in ("downloading", "done")
         self.pane_title.set_text("" if tracks_view else messages.PREVIEW)
-        self.pane_title.set_visible(not tracks_view)  # the track list explains itself
+        # while downloading and after, the left pane (ring, counts) already says all of it:
+        # no heading and no counts line above the track list (user, 2026-10-18)
+        self.pane_title.set_visible(not tracks_view)
+        self.pane_counts.set_visible(not tracks_view)
+        if self.pane_title.get_parent() is not None:
+            self.pane_title.get_parent().set_visible(not tracks_view)
         self.strip_title.set_text(messages.PREVIEW)
 
     # -- the action bar

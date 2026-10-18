@@ -167,6 +167,7 @@ class DownloadProgress:
         self.current_file = ""
         self.total_files = total_files
         self.completed_files = 0
+        self.skipped = 0  # entries the filters skipped (too long, duplicates): handled, not failed
         self.info = None   # richest info_dict seen (chapters/description) for splitting
         self.split_pending = split_pending  # defer 'completed' until the split runs
         self.done = False   # all expected files downloaded (independent of status)
@@ -240,6 +241,21 @@ class DownloadProgress:
                 'message': f"Error: {d.get('error', 'Unknown error')}"
             })
 
+    def mark_skipped(self):
+        """A filter skipped an entry. If it was the last one, the download is complete:
+        skipped tracks are handled, not failed (1.x counted only saved files, so any
+        playlist with a skip looked unfinished and was downloaded again by the
+        "alternative method")."""
+        self.skipped += 1
+        if not self.done and self.completed_files and self.completed_files + self.skipped >= self.total_files:
+            self.done = True
+            if not self.split_pending:
+                current_download.update({
+                    'status': 'completed',
+                    'total_progress': 100,
+                    'message': 'Download completed successfully!',
+                })
+
     def postprocessor_hook(self, d):
         """A file is complete only after its last post-processing step.
 
@@ -283,7 +299,7 @@ class DownloadProgress:
         })
         if self.total_files > 1:
             current_download['total_progress'] = min((self.completed_files * 100) / self.total_files, 100)
-        if self.completed_files >= self.total_files:
+        if self.completed_files + self.skipped >= self.total_files:
             self.done = True
             if self.split_pending:
                 # The split phase runs next and reports its own progress.
@@ -417,11 +433,13 @@ def download_media(url, output_dir, download_type='audio', playlist_mode='single
                 dur = info_dict.get('duration')
                 if dur is not None and dur > long_seconds():
                     set_track(info_dict, 'skipped_long')
+                    progress_tracker.mark_skipped()
                     return f"Skipping long file (>7 min): {info_dict.get('title', '')}"
             if ignore_dupes and dedupe.is_duplicate(info_dict):
                 current_download['skipped_duplicates'] = \
                     current_download.get('skipped_duplicates', 0) + 1
                 set_track(info_dict, 'skipped_duplicate')
+                progress_tracker.mark_skipped()
                 return f"Skipping duplicate: {info_dict.get('title', '')}"
             return None
         ydl_opts['match_filter'] = _combined_filter

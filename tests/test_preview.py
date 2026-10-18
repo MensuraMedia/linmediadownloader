@@ -219,3 +219,19 @@ def test_watch_link_names_its_video_inside_the_playlist(monkeypatch):
     monkeypatch.setattr(dedupe, '_manifest', [])
     p = preview.preview_link('https://www.youtube.com/watch?v=a4&list=PL1')
     assert p['kind'] == 'playlist' and p['video_title'] == 'Tetsuo'
+
+
+def test_skipped_entries_count_as_handled(monkeypatch, tmp_path):
+    """7 saved + 3 skipped of 10 is complete: no "alternative method" re-download"""
+    monkeypatch.setitem(settings.current_download, 'tracks', {})
+    monkeypatch.setattr(dedupe, 'record_download', lambda info: None)
+    tracker = media.DownloadProgress(total_files=3)
+    tracker.postprocessor_hook({'status': 'finished', 'postprocessor': 'MoveFiles', 'info_dict': {'id': 'a'}})
+    tracker.mark_skipped()
+    assert not tracker.done
+    tracker.postprocessor_hook({'status': 'finished', 'postprocessor': 'MoveFiles', 'info_dict': {'id': 'b'}})
+    assert tracker.done and settings.current_download['status'] == 'completed'
+    last = media.DownloadProgress(total_files=2)  # a skip that comes last finishes it too
+    last.postprocessor_hook({'status': 'finished', 'postprocessor': 'MoveFiles', 'info_dict': {'id': 'c'}})
+    last.mark_skipped()
+    assert last.done

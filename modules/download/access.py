@@ -288,14 +288,16 @@ def merged_firefox_profile(profile_path):
     and the bot check. Returns the folder of the merged copy, or None on failure.
     """
     source = os.path.join(profile_path, "cookies.sqlite")
-    folder = os.path.join(_private_dir(), "cookies")
     try:
-        os.makedirs(folder, mode=0o700, exist_ok=True)
-        for suffix in ("", "-wal", "-shm"):
+        # One folder per call, inside this process's own folder: a copy that a running
+        # yt-dlp may still read is never replaced or removed by another call or by another
+        # process (a test run's exit once deleted the copy a live download needed).
+        os.makedirs(_process_dir(), mode=0o700, exist_ok=True)
+        folder = tempfile.mkdtemp(prefix="cookies-", dir=_process_dir())
+        _prune_old_copies()
+        for suffix in ("", "-wal"):
             target = os.path.join(folder, "cookies.sqlite" + suffix)
-            if os.path.exists(target):
-                os.remove(target)
-            if suffix != "-shm" and os.path.exists(source + suffix):
+            if os.path.exists(source + suffix):
                 shutil.copy2(source + suffix, target)
                 os.chmod(target, 0o600)
         con = sqlite3.connect(os.path.join(folder, "cookies.sqlite"))
@@ -309,11 +311,34 @@ def merged_firefox_profile(profile_path):
         return None
 
 
+_KEEP_SECONDS = 12 * 3600  # a long playlist keeps using its copy for its whole run
+
+
+def _process_dir():
+    """This process's own folder for cookie copies (never shared with another process)"""
+    return os.path.join(_private_dir(), f"session-{os.getpid()}")
+
+
+def _prune_old_copies():
+    """Drop this process's copies older than an hour, and folders of processes that ended"""
+    now = time.time()
+    try:
+        for name in os.listdir(_process_dir()):
+            path = os.path.join(_process_dir(), name)
+            if now - os.path.getmtime(path) > _KEEP_SECONDS:
+                shutil.rmtree(path, ignore_errors=True)
+        for name in os.listdir(_private_dir()):
+            pid = name.rpartition("-")[2]
+            if name.startswith("session-") and pid.isdigit() and not os.path.exists(f"/proc/{pid}"):
+                shutil.rmtree(os.path.join(_private_dir(), name), ignore_errors=True)
+    except OSError:
+        pass
+
+
 @atexit.register
 def _remove_private_copy():
-    """Never leave a copy of sign-in cookies behind"""
-    base = os.environ.get("XDG_RUNTIME_DIR") or tempfile.gettempdir()
-    shutil.rmtree(os.path.join(base, "linmediadownloader", "cookies"), ignore_errors=True)
+    """Never leave a copy of sign-in cookies behind (only this process's own copies)"""
+    shutil.rmtree(_process_dir(), ignore_errors=True)
 
 
 _cache = {"at": 0.0, "access": None}
