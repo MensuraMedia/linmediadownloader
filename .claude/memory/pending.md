@@ -25,7 +25,12 @@ away, persisting the last result across an app restart, and clearing/curating th
 table on a new download. Treat as a small design pass before implementing. (Input box now
 auto-clears on successful completion; that part is done.)
 
-## 2026-10-18 — GTK 4 upgrade (approved; Phase 0 done, Phase 1 next)
+## 2026-10-18 — GTK 4 upgrade (approved; Phases 0–1 done, Phase 2 next)
 Plan + mockups: `docs/design/GTK4-UPGRADE-PLAN.md`, `docs/design/mockups-gtk4/`
 (canvas: https://claude.ai/artifact/Xv1GvXnzBciwh6UqgYwC7w). All 8 departures approved (decisions.md).
-Work on branch `feat/2.0-gtk4`. Next: Phase 1 — vendor lintheme, write lintheme/gtk4.
+Work on branch `feat/2.0-gtk4`. Phase 1 done (kit 1.5.0 vendored). Next: Phase 2 — shell + Download page.
+- [ ] Offer linapptemplate branch `feat/gtk4-components` (local clone in a session scratchpad,
+  commit 793f9d5) upstream — needs the user's OK; re-create from lintheme/ here if the clone is gone.
+- [ ] Kit gap: GtkDropDown arrow comes from the system theme (both toolkits), not a Phosphor caret.
+- [ ] Headless screenshots need `sudo apt install xvfb` (not installed); playback needs
+  `libgtk-4-media-gstreamer` (Phase 4).

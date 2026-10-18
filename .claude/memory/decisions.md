@@ -35,6 +35,19 @@
   queue_snapshot / clear_finished_jobs / normalize_options`; routes only translate HTTP.
 - Impact: modules/download/jobs.py (new), modules/routes/api.py.
 
+### 2026-10-18: lintheme 1.5.0 vendored, with a GTK 4 port built here
+- Reason: The kit shipped GTK 3 components only; decision 3 of the 2.0 plan says build
+  `lintheme/gtk4` here and offer it upstream.
+- Decision: GLM drafted `lintheme/gtk4` in a local linapptemplate branch
+  (`feat/gtk4-components`, commit 793f9d5, kit 1.5.0); Claude reviewed it on a real display and
+  fixed five defects GLM could not see without one (icon pixel size, icon centring, short hints
+  wrapping, layout mode stuck on "compact" after maximize, gallery window not attached to its
+  app). The app vendors that kit without `gtk3/` (GTK 4 only); `lintheme/VENDORED.md` records the
+  source. App-only icons stay in `resources/icons/phosphor/regular/` via `icons.add_icon_dir`.
+  Known gap, both toolkits: the dropdown arrow is the system theme's, not a Phosphor caret.
+  Upstreaming the branch to linapptemplate needs the user's go-ahead (push to another repo).
+- Impact: lintheme/**, ui/icons.py, resources/icons/**, examples/gallery_gtk4.py, tests/test_kit_*.py.
+
 ### 2026-10-18: AppDir/ is not hand-synced on the 2.0 branch
 - Reason: The 2026-07-31 sync rule exists only because AppDir/ is a committed copy; Phase 6
   replaces it with a build-from-source step, and syncing a half-ported tree has no user.

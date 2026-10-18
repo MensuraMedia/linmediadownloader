@@ -42,14 +42,17 @@ to `yt-dlp`.
   `LMD_DATA_DIR` overrides). Never write data relative to the cwd or the code folder.
 - Upgrade in progress: 2.0 native GTK 4 rewrite on `feat/2.0-gtk4` — docs/design/GTK4-UPGRADE-PLAN.md.
   Download/queue commands for any front end: `modules/download/jobs.py`.
+- UI kit: vendored `lintheme/` 1.5.0 (GTK 4 only; see lintheme/VENDORED.md). Never hard-code a colour:
+  tokens only. App-only icons: `resources/icons/phosphor/regular/` + `ui/icons.py` (list every used icon in USED).
 
 ## Build & Runtime Standards (Enforced)
 ```
 # Build
 # (none — pure Python)
 
-# Test (offline; tests/conftest.py isolates the data folder)
-venv/bin/python -m pytest -q
+# Test (offline; tests/conftest.py isolates the data folder). GTK 4 tests need a display
+# (desktop session or xvfb-run -a) and skip without one.
+GSK_RENDERER=cairo venv/bin/python -m pytest -q
 # Import / syntax check
 python3 -c "import modules.config.settings, modules.download.media, modules.routes.api, modules.routes.ui; print('import OK')"
 python3 -m py_compile app.py browser_app.py modules/**/*.py
