@@ -1,14 +1,19 @@
 # ui/window.py
 """The app window: the kit's dashboard shell (header + status chip + rail + pages)
-with this app's four destinations: Download, Activity and Library are real pages;
-Settings stays a placeholder until its phase. The window owns the status chip:
-`window.chip.set_status(text, key)` takes the whole sentence and a kit status key
-(the kit's own chip composes "device · word", which cannot say "Reading ·
-the link"), so every chip text the app shows stays in one place: ui/messages.py.
+with this app's four destinations, all real pages now. The window owns the status
+chip: `window.chip.set_status(text, key)` takes the whole sentence and a kit
+status key (the kit's own chip composes "device · word", which cannot say
+"Reading · the link"), so every chip text the app shows stays in one place:
+ui/messages.py.
+
+Settings changes reach the Download page through user_settings.on_change; the
+listener dispatches to the windows still alive (a WeakSet drops destroyed test
+windows — user_settings has no unsubscribe).
 """
 
 import os
 import shutil
+import weakref
 
 import gi
 
@@ -18,14 +23,35 @@ from gi.repository import Gtk  # noqa: E402
 from lintheme import status  # noqa: E402
 from lintheme.gtk4 import components as kit  # noqa: E402
 from lintheme.gtk4.shell import DashboardWindow  # noqa: E402
+from modules.config import user_settings  # noqa: E402
 from ui import icons, messages, style  # noqa: E402
 from ui.pages.activity import ActivityPage  # noqa: E402
 from ui.pages.download import DownloadPage  # noqa: E402
 from ui.pages.library import LibraryPage  # noqa: E402
+from ui.pages.settings import SettingsPage  # noqa: E402
 
 # The app's own icons (rail, cards) must resolve however the window is created
 # (entry point, tests, tools/shot_states.py); registering twice is harmless.
 icons.register()
+
+_windows = weakref.WeakSet()
+_dispatch_installed = False
+
+
+def _dispatch_settings(values):
+    """One on_change listener for every live window; dead ones drop out alone"""
+    for win in list(_windows):
+        try:
+            win.download_page.apply_defaults(values)
+        except Exception:  # a window mid-destruction must not break the others
+            pass
+
+
+def _install_dispatcher():
+    global _dispatch_installed
+    if not _dispatch_installed:
+        user_settings.on_change(_dispatch_settings)
+        _dispatch_installed = True
 
 
 def tools_chip():
@@ -102,18 +128,30 @@ class MainWindow(DashboardWindow):
         self.add_page("activity", messages.PAGE_ACTIVITY, "clock-counter-clockwise", self.activity_page)
         self.library_page = LibraryPage(self)
         self.add_page("library", messages.PAGE_LIBRARY, "music-notes", self.library_page)
+        self.settings_page = SettingsPage(self)
         self.add_page(
             "settings",
             messages.PAGE_SETTINGS,
             "gear-six",
-            self._placeholder(messages.PAGE_SETTINGS, "gear-six"),
+            self.settings_page,
             bottom=True,
         )
         self._swap_chip()
         self._rehome_rail_badges()
         # A narrow header squeezes the chip to ellipses; the word alone still says the state
         self.on_layout(lambda mode: self.chip.set_compact(mode == "compact"))
+        # Settings reach the Download page now, and again once a download ends
+        _install_dispatcher()
+        _windows.add(self)
+        self.download_page.apply_defaults(user_settings.get_settings())
+        self._was_downloading = False
+        self.download_page.on_state(self._reapply_defaults_when_idle)
         self.show_page("download")
+
+    def _reapply_defaults_when_idle(self, state):
+        if state != "downloading" and self._was_downloading:
+            self.download_page.apply_defaults(user_settings.get_settings())
+        self._was_downloading = state == "downloading"
 
     def _rehome_rail_badges(self):
         """The kit draws the count badge inside the icon's own 24 px overlay, where
@@ -149,13 +187,6 @@ class MainWindow(DashboardWindow):
         if page_id == "library":
             # "Play in Library" lands on the folder of the last download
             self.library_page.select_by_path(getattr(self.download_page, "_done_folder", ""))
-
-    @staticmethod
-    def _placeholder(label, icon_name):
-        page = kit.css(Gtk.Box(), "lt-page")
-        page.set_vexpand(True)
-        page.append(kit.EmptyState(icon_name, label, messages.COMING_LATER))
-        return page
 
     def _swap_chip(self):
         """Replace the shell's chip with one that takes full sentences; it keeps its

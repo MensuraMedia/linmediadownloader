@@ -679,6 +679,31 @@ class DownloadPage(Gtk.Box):
             self._setting_text = False
             self.start_read(url)
 
+    def apply_defaults(self, values):
+        """The Settings page's saved defaults (folder, format, quality). The window
+        calls this at start-up, on every settings save, and again once a running
+        download has ended; while one runs the change waits (nothing about the
+        download in progress is altered)."""
+        if self.state == "downloading":
+            return
+        if (
+            values.get("download_type") in ("audio", "video")
+            and values["download_type"] != self.download_type
+        ):
+            self.format_seg.set_value(values["download_type"])  # fires the format handler
+        if (
+            str(values.get("video_quality")) in jobs.VIDEO_QUALITIES
+            and str(values["video_quality"]) != self.quality
+        ):
+            self.quality = str(values["video_quality"])
+            self.quality_seg.set_value(self.quality)
+        folder = settings.download_folder(create=False)
+        if folder and folder != self.folder:
+            self.folder = folder
+            self.refresh_save_card()
+            if self.state == "ready":
+                self._refresh_ready()
+
     def _paste_link(self):
         self._paste_into(self.link_entry, then=self._read_now)
 

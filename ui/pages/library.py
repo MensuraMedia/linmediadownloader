@@ -274,6 +274,10 @@ class LibraryPage(Gtk.Box):
         self.header_badge = Gtk.Box()
         self.title_label = kit.text("", "lt-title")
         self.title_label.set_halign(Gtk.Align.START)
+        # a long folder name shortens with "…" (full name on hover); unshortened it set the
+        # whole window's minimum width (1241 px for one long playlist name)
+        self.title_label.set_ellipsize(3)
+        self.title_label.set_hexpand(True)
         self.rename_button = kit.icon_button("pencil-simple", "", on_click=lambda: self._start_rename())
         self.title_box = Gtk.Box(spacing=8)
         self.title_box.append(self.title_label)
@@ -561,6 +565,7 @@ class LibraryPage(Gtk.Box):
         _clear_box(self.header_badge)
         self.header_badge.append(badge_label(item.get("order", 0), item.get("color"), size=36))
         self.title_label.set_text(item["name"])
+        self.title_label.set_tooltip_text(item["name"])
         self.title_box.set_visible(True)  # a rename left unfinished on another playlist
         self.rename_button.set_tooltip_text(messages.LIB_RENAME.format(name=item["name"]))
         kit.name(self.rename_button, messages.LIB_RENAME.format(name=item["name"]))

@@ -389,3 +389,147 @@ ERRORS = {
         "body": "The reason is under Details. Try again; if it keeps failing, a newer yt-dlp may help.",
     },
 }
+
+# -- Settings page ----------------------------------------------------------------
+SET_CAPTION = "Changes save as you make them"
+SET_CARD_DOWNLOADS = "Downloads"
+SET_SAVE_TO = "Save to"
+SET_CHANGE = "Change…"
+SET_USE_DEFAULT = "Use default"
+SET_FOLDER_NOTE = "Files and playlist folders go here. Default: {path}"
+SET_FOLDER_DENIED = "That folder could not be created or written. The previous one is kept."
+SET_FOLDER_NAME = "Download folder"
+SET_FORMAT = "Format"
+SET_FORMAT_NAME = "Default format"
+SET_QUALITY = "Video quality"
+SET_QUALITY_NAME = "Default video quality"
+SET_LONG_MEANS = '"Long" means'
+SET_LONG_NAME = "How many minutes long means"
+SET_LONG_UNIT = " min"
+SET_LONG_NOTE = "used by Skip long files"
+
+SET_CARD_TIDY = "Tidy names"
+SET_RESET_DEFAULTS = "Reset to defaults"
+SET_RESET_TITLE = "Reset tidy names to the defaults?"
+SET_RESET_BODY = "Your added words and replacements are replaced by the built-in ones."
+SET_RESET_KEEP = "Keep mine"
+SET_RESET_GO = "Reset to defaults"
+SET_FILLER_NOTE = 'Filler words, removed by "Remove filler words"'
+SET_REMOVE_WORD = "Remove {word}"
+SET_MORE_WORDS = "+ {n} more"
+SET_FEWER_WORDS = "Show the first 12"
+SET_ADD_WORD = "Add a word"
+SET_ADD = "Add"
+SET_WORD_ADDED = "Added"
+SET_WORD_EXISTS = "Already in the list"
+SET_REPLACEMENTS = "Character replacements"
+SET_FROM = "From"
+SET_BECOMES = "becomes"
+SET_TO = "To"
+SET_REMOVE_REPLACEMENT = "Remove this replacement"
+SET_ADD_REPLACEMENT = "Add replacement"
+SET_REPLACEMENT_NEEDS_FROM = "Fill in the text to replace first"
+
+SET_CARD_TOOLS = "Tools"
+SET_READY = "Ready"
+SET_NEEDS_YOU = "Needs you · missing"
+SET_YTDLP = "yt-dlp"
+SET_FFMPEG = "ffmpeg"
+SET_CHECK_UPDATE = "Check for update"
+SET_UPDATING = "Updating yt-dlp…"
+SET_UPDATED = "Updated: {before} to {after}"
+SET_ALREADY_NEW = "Already up to date: {version}"
+SET_UPDATE_FAILED = "The update did not finish"
+SET_UPDATE_BLOCKED = "yt-dlp comes from a system package here, so the app leaves updating to it"
+SET_RESTART_NOTE = "The new version is used after the app restarts"
+SET_DETAILS = "Details"
+SET_FROM_SYSTEM = "from your system packages"
+
+SET_CARD_SIGNIN = "YouTube sign-in"
+SET_SIGNIN_NAME = "Browser sign-in"
+SET_SIGNIN_AUTO = "Automatic (recommended)"
+SET_SIGNIN_OFF = "Off"
+SET_SIGNIN_SAVED = "Saved choice · {name} (checking…)"
+SET_SIGNIN_NOW = "In use now: {words}"
+SET_SIGNIN_NONE = "No signed-in browser found on this computer"
+SET_SIGNIN_OFF_NOW = "Sign-in is off: YouTube may ask to confirm you're not a bot"
+SET_SIGNIN_NOTE = (
+    "The app reads only whether you are signed in. yt-dlp uses that browser's YouTube "
+    "cookies on this computer and sends them only to YouTube."
+)
+SET_SIGNIN_CHECKING = "Looking for signed-in browsers…"
+
+SET_CARD_PRIVACY = "Privacy"
+SET_KEPT_HERE = "Kept here"
+SET_KEPT_HERE_VALUE = "History, settings, the duplicate list and logs"
+SET_FOLDER_KEY = "Folder"
+SET_NETWORK = "Network"
+SET_NETWORK_VALUE = "Only the sites you paste, through yt-dlp. No accounts, no telemetry, no AI."
+SET_OPEN_DATA = "Open data folder"
+SET_SAVE_DIAGNOSTICS = "Save diagnostics…"
+SET_DIAG_SAVING = "Saving diagnostics…"
+SET_DIAG_SAVED = "Saved to {path}"
+SET_SHOW_FILE = "Show file"
+SET_DIAG_FAILED = "The diagnostics file could not be written"
+
+SET_CARD_ABOUT = "About"
+SET_VERSION = "Version"
+SET_VERSION_VALUE = "LinMediaDownloader 2.0.0 · GTK {gtk}"
+SET_LICENCE = "Licence"
+SET_LICENCE_VALUE = "CC BY-NC 4.0 · personal, non-commercial use"
+SET_SHORTCUTS = "Keyboard shortcuts"
+SET_SHORTCUTS_TITLE = "Keyboard shortcuts"
+SET_HELP = "Help and FAQ"
+SET_CREDITS = "Credits"
+SET_CREDITS_TITLE = "Credits"
+SET_CREDITS_WORDS = (
+    "yt-dlp downloads and reads links. ffmpeg converts and splits. GTK and PyGObject draw "
+    "the window. Icons: Phosphor (MIT). Font: Ubuntu. Styling and widgets: lintheme."
+)
+
+# -- help window (the 1.x FAQ, kept where it still applies to 2.0) -----------------
+HELP_TITLE = "Help and FAQ"
+HELP_SECTIONS = (
+    (
+        "What is LinMediaDownloader?",
+        "A desktop app for saving YouTube media, as audio or video, single tracks or whole "
+        "playlists, for personal use. yt-dlp downloads, ffmpeg converts and splits.",
+    ),
+    (
+        "The download choices",
+        "Paste a link and the app reads it: a live preview shows every track and which ones "
+        "would be skipped. Audio is MP3 at 192 kbps; video is MP4 at up to 1080p. For a "
+        "playlist you can take this video, all of it, or the first few.",
+    ),
+    (
+        'How does "Split into chapters" work?',
+        "Some long videos are many tracks in one. With this option the app downloads the "
+        "single video, reads the chapter boundaries from its description, and splits it "
+        "into one file per chapter. The whole file is kept only when no chapters are found.",
+    ),
+    (
+        "Tidy names",
+        "The Tidy names tool in the Library renames many files at once: removing filler "
+        "words, symbols or spaces, shortening names, changing case. Every operation shows "
+        "a preview first and can be undone.",
+    ),
+    (
+        "Troubleshooting",
+        'If YouTube answers "Sign in to confirm you\'re not a bot", sign in to YouTube in '
+        "any browser on this computer and let the app use that sign-in (Settings). "
+        "Converting and splitting need ffmpeg from your system packages.",
+    ),
+)
+
+# -- shortcuts window ---------------------------------------------------------------
+SHORTCUT_ROWS = (
+    ("Ctrl+Enter", "Start the download"),
+    ("Esc", "Cancel the running download"),
+    ("Ctrl+L", "Focus the link field"),
+    ("Ctrl+V", "Paste a link"),
+    ("Alt+1 to 4", "Switch pages"),
+    ("Space", "Play or pause"),
+    ("Right / Left", "Seek 5 s forward, 2 s back"),
+    ("Up / Down", "Volume"),
+    ("Delete", "Stop and move the file to the trash"),
+)

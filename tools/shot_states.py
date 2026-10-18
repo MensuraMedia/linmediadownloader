@@ -464,6 +464,54 @@ def apply_confirm_trash_state(window):
     return patches, dialogs
 
 
+def apply_settings_state(window):
+    """The Settings page from fake tools and profiles (no browser scan, no network)"""
+    import unittest.mock as mock
+
+    from modules import tools as tools_module
+    from modules.config import user_settings
+    from modules.download import access
+
+    saved = dict(user_settings._defaults())
+    saved.update(
+        {
+            "download_type": "audio",
+            "video_quality": "1080",
+            "char_replacements": [
+                {"from": "&", "to": "and"},
+                {"from": "+", "to": "plus"},
+                {"from": "#", "to": "No"},
+            ],
+        }
+    )
+    profiles = [
+        access.Profile(
+            "LibreWolf",
+            "firefox",
+            "/home/user/.librewolf/30nh4ac4.default-default",
+            "",
+            True,
+            True,
+        ),
+        access.Profile("Firefox", "firefox", "/home/user/.mozilla/firefox/1a2b.default", ""),
+    ]
+    in_use = access.Access(profiles[0], {"deno": {"path": "/usr/bin/deno"}})
+    patches = [
+        mock.patch.object(tools_module, "ytdlp_version", lambda: "2026.10.09"),
+        mock.patch.object(tools_module, "ffmpeg_version", lambda: ("6.1.1-static", "/usr/bin/ffmpeg")),
+        mock.patch.object(tools_module, "can_update_ytdlp", lambda: True),
+        mock.patch.object(access, "discover_profiles", lambda: profiles),
+        mock.patch.object(access, "current", lambda refresh=False: in_use),
+        mock.patch.object(user_settings, "get_settings", lambda: dict(saved)),
+        mock.patch.object(user_settings, "save_settings", lambda new: saved.update(new) or saved),
+    ]
+    for patch in patches:
+        patch.start()
+    window.show_page("settings")
+    window.settings_page._read_tools_once()
+    return patches
+
+
 def shoot_widget(widget, path):
     """Paint one widget (a popover's child, a dialog window) into its own PNG"""
     width = widget.get_width() or widget.get_allocated_width()
@@ -498,6 +546,7 @@ def main():
             "library",
             "library-tidy",
             "confirm-trash",
+            "settings",
         ],
     )
     parser.add_argument("--out", required=True)
@@ -513,7 +562,13 @@ def main():
         window = MainWindow(application)
         if args.state == "narrow":
             window.set_default_size(720, 800)
-        if args.state in ("activity", "library", "library-tidy", "confirm-trash"):
+        if args.state in (
+            "activity",
+            "library",
+            "library-tidy",
+            "confirm-trash",
+            "settings",
+        ):
             window.download_page.poller.stop()  # no real download follows us here
         dialogs = []
         if args.state == "activity":
@@ -524,6 +579,8 @@ def main():
             apply_library_tidy_state(window)
         elif args.state == "confirm-trash":
             _patches, dialogs = apply_confirm_trash_state(window)
+        elif args.state == "settings":
+            apply_settings_state(window)
         else:
             apply_state(window.download_page, state)
 

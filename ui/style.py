@@ -40,6 +40,8 @@ def _tint_classes():
 
 CSS = f"""
 .lmd-dim {{ opacity: 0.55; }}
+.lt-icon-btn.lmd-tag-x {{ min-width: 32px; min-height: 32px; padding: 0; }}
+.lt-pill.lmd-tag {{ padding: 0 2px 0 10px; }}
 .lt-card.lmd-list {{ padding: 0; }}
 .lt-card.lmd-list .lt-row {{ padding: 0 16px; }}
 .lt-card.lmd-list .lt-thead {{ padding: 0 16px; }}
