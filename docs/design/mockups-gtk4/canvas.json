@@ -1,0 +1,34 @@
+{
+  "v": 3,
+  "createdOnFiles": {"v": 1, "at": "2026-10-18T10:30:00Z"},
+  "title": "LinMediaDownloader GTK4 Mockups",
+  "launch": {"view": "canvas"},
+  "pages": [],
+  "boards": {
+    "Main.dc.html": {"x": 0, "y": 0, "w": 1200, "h": 800, "title": "1 Download: ready, playlist found"},
+    "Downloading.dc.html": {"x": 1280, "y": 0, "w": 1200, "h": 800, "title": "2 Download: in progress"},
+    "Done.dc.html": {"x": 2560, "y": 0, "w": 1200, "h": 800, "title": "3 Download: finished (end moment)"},
+    "Error.dc.html": {"x": 3840, "y": 0, "w": 1200, "h": 800, "title": "4 Download: can't reach the site"},
+    "Activity.dc.html": {"x": 0, "y": 1220, "w": 1200, "h": 800, "title": "5 Activity: queue and history"},
+    "Library.dc.html": {"x": 1280, "y": 1220, "w": 1200, "h": 800, "title": "6 Library: playlist, tidy names, player"},
+    "Settings.dc.html": {"x": 2560, "y": 1220, "w": 1200, "h": 800, "title": "7 Settings: downloads, tools, privacy, about"},
+    "Dialog.dc.html": {"x": 3840, "y": 1220, "w": 1200, "h": 800, "title": "8 Destructive confirm: empty trash"},
+    "Narrow.dc.html": {"x": 5120, "y": 1220, "w": 720, "h": 800, "title": "9 Narrow window (720 px)"}
+  },
+  "order": [
+    "Main.dc.html",
+    "Downloading.dc.html",
+    "Done.dc.html",
+    "Error.dc.html",
+    "Activity.dc.html",
+    "Library.dc.html",
+    "Settings.dc.html",
+    "Dialog.dc.html",
+    "Narrow.dc.html"
+  ],
+  "notes": {
+    "row1": {"x": 0, "y": -300, "text": "Download flow: GTK 4 · Graphite Night · four destinations", "kind": "title1", "maxW": 5040},
+    "row2": {"x": 0, "y": 920, "text": "Activity, Library, Settings, dialogs, narrow window", "kind": "title1", "maxW": 5840}
+  },
+  "designSystems": []
+}

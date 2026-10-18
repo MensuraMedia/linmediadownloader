@@ -417,13 +417,25 @@ See [docs/concept-file-manager.md](docs/concept-file-manager.md) for the origina
 
 ## 9. Data & Persistence
 
-| File | Contents | Tracked in git? |
-|------|----------|-----------------|
-| `data/download_history.json` | Completed downloads (≤100) | No (runtime) |
-| `data/links_history.json` | Submitted links (≤500) | No (runtime) |
-| `downloads/`, `backups/` | Created at startup as fallbacks | No |
+All user data lives in one folder, `~/.local/share/linmediadownloader` (`$XDG_DATA_HOME`;
+override with `LMD_DATA_DIR`), resolved by `modules/config/paths.py`. Nothing is written to the
+working directory or the code folder, so reinstalling or uninstalling never touches it.
 
-Runtime JSON is git-ignored (`**/data/*.json`) and regenerated on demand.
+| File (in the data folder) | Contents |
+|------|----------|
+| `download_history.json` | Completed downloads (≤100) |
+| `links_history.json` | Submitted links (≤500) |
+| `app_settings.json` | Filler words + character replacements |
+| `download_manifest.json` | Ignore Duplicates manifest (ids + original titles) |
+| `playlist_colors.json`, `playlist_seq.json` | Playlist badge colours and sequence numbers |
+| `logs/app.log` | Rotating log (1 MB × 4) |
+| `downloads/` | Only if you have no Downloads folder |
+
+**Upgrading from 1.x:** on first start the app copies the newest 1.x copy of each file above
+from `data/` under `~/.local/share/linux-media-downloader`, the code folder or the launch folder.
+Originals are left in place, existing files are never overwritten, corrupt files are skipped,
+and `migrated-from-1.x.json` records what was copied (it runs once). Old `downloads/` folders
+are still scanned by the Playlists and File Manager pages. Set `LMD_NO_MIGRATE=1` to skip it.
 
 ---
 
@@ -482,7 +494,8 @@ the ffmpeg-bundling requirement — see [docs/packaging.md](docs/packaging.md).
 | YouTube bot-check on some hosts/IPs | External; may require cookies (`--cookies-from-browser`) |
 | `RD…` "Mix"/radio playlists are huge/dynamic | Expected yt-dlp behaviour |
 | Per-file `ffprobe` on playlist open | Slow for very large folders (could be cached) |
-| cwd-relative data/download paths | Anchor to a fixed app-data dir (planned) |
+| cwd-relative data/download paths | Fixed on the 2.0 branch: one data folder (§9) |
+| Web UI (Flask + PyWebView) | Being replaced by native GTK 4 in 2.0 — [plan](docs/design/GTK4-UPGRADE-PLAN.md), [mockups](docs/design/mockups-gtk4/README.md) |
 | Native window (`app.py`) needs a display | Use `browser_app.py` when headless |
 | Integration test with a real download + CI | Planned |
 | **File Manager** (dense grid of app files, stats, global text ops, inline keyboard player) | Implemented — see §7.8 |

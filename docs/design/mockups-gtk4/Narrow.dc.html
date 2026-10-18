@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Download, narrow window</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;500&amp;family=Ubuntu+Mono&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#141619}
+.w{width:720px;height:800px;box-sizing:border-box;background:#1c1f23;color:#eceff3;font-family:Ubuntu,sans-serif;font-size:14px;line-height:21px;display:flex;flex-direction:column;overflow:hidden;border:1px solid #3a4048;border-radius:10px}
+.hdr{height:52px;flex:none;box-sizing:border-box;display:flex;align-items:center;gap:12px;padding:0 8px 0 16px;background:#262a30;border-bottom:1px solid #3a4048}
+.brand{font-size:16px;line-height:24px;font-weight:500}
+.chip{display:inline-flex;align-items:center;gap:8px;height:32px;padding:0 14px;border-radius:999px;border:1px solid #5fd38d;background:#1d3a2a;color:#eceff3;font:inherit}
+.ib{width:32px;height:32px;border-radius:6px;border:0;background:transparent;color:#eceff3;display:inline-flex;align-items:center;justify-content:center;padding:0}
+.bd{flex:1;display:flex;min-height:0}
+.rail{width:72px;flex:none;box-sizing:border-box;background:#17191d;border-right:1px solid #3a4048;display:flex;flex-direction:column;align-items:center;gap:8px;padding:12px 0}
+.ri{width:60px;height:60px;box-sizing:border-box;border-radius:10px;border:2px solid transparent;background:transparent;color:#eceff3;font:inherit;font-size:12px;line-height:18px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:0}
+.ri.on{background:#1f3350;border-color:#4c9dff;color:#4c9dff}
+.main{flex:1;display:flex;flex-direction:column;min-width:0}
+.col{flex:1;box-sizing:border-box;padding:16px 24px;display:flex;flex-direction:column;gap:12px;overflow:hidden}
+.card{background:#262a30;border:1px solid #3a4048;border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:12px}
+.h{font-size:16px;line-height:24px;font-weight:500;margin:0}
+.muted{color:#aab2bd}
+.cap{font-size:12px;line-height:18px;color:#aab2bd}
+.row{display:flex;align-items:center;gap:12px}
+.segs{display:flex;gap:8px;flex-wrap:wrap}
+.seg{height:36px;padding:0 14px;border-radius:6px;border:1px solid #7d8590;background:transparent;color:#eceff3;font:inherit;display:inline-flex;align-items:center;gap:8px;white-space:nowrap}
+.seg.on{background:#4c9dff;border-color:#4c9dff;color:#0b1320}
+.entry{height:36px;box-sizing:border-box;border:1px solid #7d8590;border-radius:6px;background:#1c1f23;color:#eceff3;font:inherit;padding:0 12px;display:flex;align-items:center;gap:8px;flex:1;min-width:0;white-space:nowrap;overflow:hidden}
+.btn{height:36px;padding:0 14px;border-radius:6px;border:1px solid #7d8590;background:#262a30;color:#eceff3;font:inherit;display:inline-flex;align-items:center;gap:8px;white-space:nowrap;flex:none}
+.primary{height:48px;padding:0 24px;border-radius:6px;border:0;background:#4c9dff;color:#0b1320;font:inherit;font-size:16px;font-weight:500;display:inline-flex;align-items:center;justify-content:center;gap:12px;flex:none}
+.sw{width:40px;height:22px;border-radius:999px;background:#4c9dff;border:1px solid #4c9dff;position:relative;flex:none;box-sizing:border-box;padding:0}
+.sw::after{content:"";position:absolute;top:2px;left:20px;width:16px;height:16px;border-radius:50%;background:#0b1320}
+.abar{height:84px;flex:none;box-sizing:border-box;background:#262a30;border-top:1px solid #3a4048;display:flex;align-items:center;gap:12px;padding:0 24px}
+.lnk{color:#4c9dff;text-decoration:underline;background:none;border:0;font:inherit;padding:0;text-align:left}
+</style>
+</helmet>
+<div class="w">
+  <header class="hdr">
+    <svg width="20" height="20" viewBox="0 0 256 256" fill="#4c9dff" aria-hidden="true"><path d="M224,152v56a16,16,0,0,1-16,16H48a16,16,0,0,1-16-16V152a8,8,0,0,1,16,0v56H208V152a8,8,0,0,1,16,0Zm-101.66,5.66a8,8,0,0,0,11.32,0l40-40a8,8,0,0,0-11.32-11.32L136,132.69V40a8,8,0,0,0-16,0v92.69L93.66,106.34a8,8,0,0,0-11.32,11.32Z"/></svg>
+    <span class="brand">LinMediaDownloader</span>
+    <span style="flex:1"></span>
+    <button class="chip" aria-label="Tools status: ready">
+      <svg width="18" height="18" viewBox="0 0 256 256" fill="#5fd38d" aria-hidden="true"><path d="M173.66,98.34a8,8,0,0,1,0,11.32l-56,56a8,8,0,0,1-11.32,0l-24-24a8,8,0,0,1,11.32-11.32L112,148.69l50.34-50.35A8,8,0,0,1,173.66,98.34ZM232,128A104,104,0,1,1,128,24,104.11,104.11,0,0,1,232,128Zm-16,0a88,88,0,1,0-88,88A88.1,88.1,0,0,0,216,128Z"/></svg>
+      Ready
+    </button>
+    <button class="ib" aria-label="Main menu"><svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M140,128a12,12,0,1,1-12-12A12,12,0,0,1,140,128Zm56-12a12,12,0,1,0,12,12A12,12,0,0,0,196,116ZM60,116a12,12,0,1,0,12,12A12,12,0,0,0,60,116Z"/></svg></button>
+    <button class="ib" aria-label="Close"><svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M205.66,194.34a8,8,0,0,1-11.32,11.32L128,139.31,61.66,205.66a8,8,0,0,1-11.32-11.32L116.69,128,50.34,61.66A8,8,0,0,1,61.66,50.34L128,116.69l66.34-66.35a8,8,0,0,1,11.32,11.32L139.31,128Z"/></svg></button>
+  </header>
+  <div class="bd">
+    <nav class="rail" aria-label="Destinations">
+      <button class="ri on" aria-current="page"><svg width="24" height="24" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M224,152v56a16,16,0,0,1-16,16H48a16,16,0,0,1-16-16V152a8,8,0,0,1,16,0v56H208V152a8,8,0,0,1,16,0Zm-101.66,5.66a8,8,0,0,0,11.32,0l40-40a8,8,0,0,0-11.32-11.32L136,132.69V40a8,8,0,0,0-16,0v92.69L93.66,106.34a8,8,0,0,0-11.32,11.32Z"/></svg>Download</button>
+      <button class="ri"><svg width="24" height="24" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M136,80v43.47l36.12,21.67a8,8,0,0,1-8.24,13.72l-40-24A8,8,0,0,1,120,128V80a8,8,0,0,1,16,0Zm-8-48A95.44,95.44,0,0,0,60.08,60.15C52.81,67.51,46.35,74.59,40,82V64a8,8,0,0,0-16,0v40a8,8,0,0,0,8,8H72a8,8,0,0,0,0-16H49c7.15-8.42,14.27-16.35,22.39-24.57a80,80,0,1,1,1.66,114.75,8,8,0,1,0-11,11.64A96,96,0,1,0,128,32Z"/></svg>Activity</button>
+      <button class="ri"><svg width="24" height="24" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M212.92,25.69a8,8,0,0,0-6.86-1.45l-128,32A8,8,0,0,0,72,64V174.08A36,36,0,1,0,88,204V118.25l112-28v51.83A36,36,0,1,0,216,172V32A8,8,0,0,0,212.92,25.69ZM52,224a20,20,0,1,1,20-20A20,20,0,0,1,52,224ZM88,101.75V70.25l112-28v31.5ZM180,192a20,20,0,1,1,20-20A20,20,0,0,1,180,192Z"/></svg>Library</button>
+      <span style="flex:1"></span>
+      <button class="ri"><svg width="24" height="24" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M128,80a48,48,0,1,0,48,48A48.05,48.05,0,0,0,128,80Zm0,80a32,32,0,1,1,32-32A32,32,0,0,1,128,160Zm109.94-52.79a8,8,0,0,0-3.89-5.4l-29.83-17-.12-33.62a8,8,0,0,0-2.83-6.08,111.91,111.91,0,0,0-36.72-20.67,8,8,0,0,0-6.46.59L128,41.85,97.88,25a8,8,0,0,0-6.47-.6A112.1,112.1,0,0,0,54.73,45.15a8,8,0,0,0-2.83,6.07l-.15,33.65-29.83,17a8,8,0,0,0-3.89,5.4,106.47,106.47,0,0,0,0,41.56,8,8,0,0,0,3.89,5.4l29.83,17,.12,33.62a8,8,0,0,0,2.83,6.08,111.91,111.91,0,0,0,36.72,20.67,8,8,0,0,0,6.46-.59L128,214.15,158.12,231a7.91,7.91,0,0,0,3.9,1,8.09,8.09,0,0,0,2.57-.42,112.1,112.1,0,0,0,36.68-20.73,8,8,0,0,0,2.83-6.07l.15-33.65,29.83-17a8,8,0,0,0,3.89-5.4A106.47,106.47,0,0,0,237.94,107.21Zm-15,34.91-28.57,16.25a8,8,0,0,0-3,3c-.58,1-1.19,2.06-1.81,3.06a7.94,7.94,0,0,0-1.22,4.21l-.15,32.25a95.89,95.89,0,0,1-25.37,14.3L134,199.13a8,8,0,0,0-3.91-1h-.19c-1.21,0-2.43,0-3.64,0a8.08,8.08,0,0,0-4.1,1l-28.84,16.1A96,96,0,0,1,67.88,201l-.11-32.2a8,8,0,0,0-1.22-4.22c-.62-1-1.23-2-1.8-3.06a8.09,8.09,0,0,0-3-3.06l-28.6-16.29a90.49,90.49,0,0,1,0-28.26L61.67,97.63a8,8,0,0,0,3-3c.58-1,1.19-2.06,1.81-3.06a7.94,7.94,0,0,0,1.22-4.21l.15-32.25a95.89,95.89,0,0,1,25.37-14.3L122,56.87a8,8,0,0,0,4.1,1c1.21,0,2.43,0,3.64,0a8.08,8.08,0,0,0,4.1-1l28.84-16.1A96,96,0,0,1,188.12,55l.11,32.2a8,8,0,0,0,1.22,4.22c.62,1,1.23,2,1.8,3.06a8.09,8.09,0,0,0,3,3.06l28.6,16.29A90.49,90.49,0,0,1,222.9,142.12Z"/></svg>Settings</button>
+    </nav>
+    <main class="main">
+      <div class="col">
+        <div class="card">
+          <h2 class="h">Link</h2>
+          <div class="row">
+            <div class="entry" role="textbox" aria-label="Video or playlist link"><span style="overflow:hidden;text-overflow:ellipsis">youtube.com/playlist?list=PLctRJ2wzOv…</span></div>
+            <button class="btn">Paste</button>
+          </div>
+          <div class="row" style="gap:8px">
+            <svg width="16" height="16" viewBox="0 0 256 256" fill="#5fd38d" aria-hidden="true"><path d="M173.66,98.34a8,8,0,0,1,0,11.32l-56,56a8,8,0,0,1-11.32,0l-24-24a8,8,0,0,1,11.32-11.32L112,148.69l50.34-50.35A8,8,0,0,1,173.66,98.34ZM232,128A104,104,0,1,1,128,24,104.11,104.11,0,0,1,232,128Zm-16,0a88,88,0,1,0-88,88A88.1,88.1,0,0,0,216,128Z"/></svg>
+            <span style="color:#5fd38d">Playlist found</span><span class="muted">· AKIRA OST · 10 videos</span>
+          </div>
+        </div>
+        <div class="card">
+          <h2 class="h">Format</h2>
+          <div class="segs"><button class="seg on">Audio · MP3</button><button class="seg">Video · MP4</button></div>
+        </div>
+        <div class="card">
+          <h2 class="h">Playlist</h2>
+          <div class="segs"><button class="seg">This video</button><button class="seg on">All 10</button><button class="seg">First…</button></div>
+          <div class="row"><button class="sw" role="switch" aria-checked="true" aria-label="Skip long files"></button><span>Skip long files</span><span class="cap">1 over 7 min</span></div>
+          <div class="row"><button class="sw" role="switch" aria-checked="true" aria-label="Ignore duplicates"></button><span>Ignore duplicates</span><span class="cap">2 you have</span></div>
+        </div>
+        <div class="card">
+          <h2 class="h">Save to</h2>
+          <div class="row"><div class="entry" style="border-color:#3a4048">~/Music/AKIRA OST</div><button class="btn">Change…</button></div>
+        </div>
+        <div class="card" style="flex-direction:row;align-items:center">
+          <div style="flex:1;display:flex;flex-direction:column"><span class="h">Preview</span><span class="muted">10 videos · 7 to download · 3 skipped</span></div>
+          <button class="btn" aria-expanded="false">Show list</button>
+        </div>
+      </div>
+      <footer class="abar">
+        <div style="display:flex;flex-direction:column;flex:1;min-width:0">
+          <span>7 tracks · about 31 MB</span>
+          <span class="cap">Audio MP3 · ~/Music/AKIRA OST</span>
+        </div>
+        <button class="primary">
+          <svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M224,152v56a16,16,0,0,1-16,16H48a16,16,0,0,1-16-16V152a8,8,0,0,1,16,0v56H208V152a8,8,0,0,1,16,0Zm-101.66,5.66a8,8,0,0,0,11.32,0l40-40a8,8,0,0,0-11.32-11.32L136,132.69V40a8,8,0,0,0-16,0v92.69L93.66,106.34a8,8,0,0,0-11.32,11.32Z"/></svg>
+          Download
+        </button>
+      </footer>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":720,"height":800}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

@@ -35,12 +35,14 @@ Legend: ✅ shipped · 🧭 designed (concept doc) · 🛠️ planned · 💡 id
 
 ## 🛠️ Planned
 
+- **2.0: native GTK 4 rewrite** — Python + GTK 4 with the Lin* theme (Graphite Night), four
+  destinations instead of ten pages, no web view or local web server, everything installed
+  locally. In progress on `feat/2.0-gtk4`; 1.x is tagged `v1.0.0`.
+  → [mockups](docs/design/mockups-gtk4/README.md) · [plan](docs/design/GTK4-UPGRADE-PLAN.md)
 - **Packaged builds** — `.deb` builder shipped (`packaging/build-deb.sh`); still to do: finish
   the AppImage, a Windows PyInstaller `.exe` (+ installer), and auto-publish to GitHub
   Releases (CI). → [docs/packaging.md](docs/packaging.md)
 - **`pyproject.toml`** — enable `pipx install git+…` one-line installs.
-- **Fixed app-data directory** — store history/config/downloads under a stable location
-  (`~/.local/share/linux-media-downloader`) instead of the working directory.
 - **YouTube cookie support** — a UI option to pass browser cookies (`--cookies-from-browser`)
   to get past bot-checks on rate-limited networks.
 - **Keep yt-dlp current** — self-update / version indicator (it changes often against YouTube).

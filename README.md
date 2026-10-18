@@ -103,6 +103,17 @@ remove. Other platforms / manual setup: **[INSTALL.md](INSTALL.md)**.
 
 ![Main UI](screenshots/mbs-main-ui.png)
 
+### Coming in 2.0: native GTK 4
+
+Version 2.0 is a full rewrite as a native GTK 4 app (no web view, no browser), with four
+destinations (Download, Activity, Library, Settings) instead of ten pages. Work happens on the
+`feat/2.0-gtk4` branch; 1.x stays available as the `v1.0.0` tag and the `release/1.x` branch.
+
+![2.0 Download page mockup](docs/design/mockups-gtk4/images/Main.png)
+
+All nine mockups: **[docs/design/mockups-gtk4](docs/design/mockups-gtk4/README.md)** ·
+plan: **[GTK4-UPGRADE-PLAN.md](docs/design/GTK4-UPGRADE-PLAN.md)**
+
 ---
 
 ## 🏗️ Architecture
@@ -270,8 +281,9 @@ Pages: `/` (Home), `/backups` (History), `/playlists` (Playlists), `/links` (Lin
 | Setting | How | Default |
 |---------|-----|---------|
 | Flask secret key | `SECRET_KEY` env var | random per run (`os.urandom`) |
-| Download folder | Selected in UI / `output_dir` in `/api/download` | XDG Downloads → `~/Downloads` → `./downloads` |
-| History file | `data/download_history.json` | last 100 entries |
+| Download folder | Selected in UI / `output_dir` in `/api/download` | XDG Downloads → `~/Downloads` → `<data dir>/downloads` |
+| Data folder | `LMD_DATA_DIR` env var | `~/.local/share/linmediadownloader` (`$XDG_DATA_HOME`) |
+| History file | `<data dir>/download_history.json` | last 100 entries |
 | Audio codec/quality | `modules/download/media.py` | MP3 @ 192 kbps |
 
 ```bash
@@ -324,9 +336,9 @@ folder if needed) to keep user-level apps organized.
 > features are added and refined based on real use. The full, categorized roadmap (shipped /
 > designed / planned / ideas) lives in **[ROADMAP.md](ROADMAP.md)**.
 
-Highlights of what's coming: packaged installers (AppImage / .deb / Windows `.exe`),
-one-line `pipx` install, **Ignore Duplicates**, YouTube cookie support, a fixed app-data
-directory, more sources (Vimeo, SoundCloud), and CI. See [ROADMAP.md](ROADMAP.md) for the rest.
+Next up: **2.0, a native GTK 4 rewrite** — see the
+[mockups](docs/design/mockups-gtk4/README.md). Also coming: packaged installers (AppImage / .deb / Windows `.exe`),
+one-line `pipx` install, YouTube cookie support, more sources (Vimeo, SoundCloud), and CI. See [ROADMAP.md](ROADMAP.md) for the rest.
 
 ---
 

@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Confirm, empty trash</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;500&amp;family=Ubuntu+Mono&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#141619}
+.w{width:1200px;height:800px;box-sizing:border-box;background:#1c1f23;color:#eceff3;font-family:Ubuntu,sans-serif;font-size:14px;line-height:21px;display:flex;flex-direction:column;overflow:hidden;border:1px solid #3a4048;border-radius:10px;position:relative}
+.hdr{height:52px;flex:none;box-sizing:border-box;display:flex;align-items:center;gap:12px;padding:0 16px;background:#262a30;border-bottom:1px solid #3a4048}
+.bd{flex:1;display:flex;min-height:0}
+.rail{width:88px;flex:none;background:#17191d;border-right:1px solid #3a4048}
+.ghost{background:#262a30;border:1px solid #3a4048;border-radius:10px}
+.scrim{position:absolute;inset:0;background:rgba(10,12,14,.66);display:flex;align-items:center;justify-content:center}
+.dlg{width:500px;box-sizing:border-box;background:#2f343b;border:1px solid #7d8590;border-radius:14px;padding:24px;display:flex;flex-direction:column;gap:16px;box-shadow:0 16px 48px rgba(0,0,0,.5)}
+.title{font-size:20px;line-height:28px;font-weight:500;margin:0}
+.muted{color:#aab2bd}
+.cap{font-size:12px;line-height:18px;color:#aab2bd}
+.row{display:flex;align-items:center;gap:12px}
+.tile{width:44px;height:44px;border-radius:10px;background:#3f2422;color:#ff8a80;flex:none;display:flex;align-items:center;justify-content:center}
+.files{background:#1c1f23;border:1px solid #3a4048;border-radius:6px;padding:10px 12px;display:flex;flex-direction:column;gap:2px;font-family:"Ubuntu Mono",monospace;font-size:13px;line-height:19px}
+.btn{height:40px;padding:0 18px;border-radius:6px;border:1px solid #7d8590;background:#262a30;color:#eceff3;font:inherit;display:inline-flex;align-items:center;gap:8px;white-space:nowrap}
+.focus{outline:2px solid #ffd75e;outline-offset:2px}
+.danger{height:40px;padding:0 18px;border-radius:6px;border:0;background:#ff8a80;color:#0b1320;font:inherit;font-weight:500;display:inline-flex;align-items:center;gap:8px;white-space:nowrap}
+.kbd{font-family:"Ubuntu Mono",monospace;font-size:12px;line-height:16px;padding:0 6px;border:1px solid currentColor;border-radius:4px}
+</style>
+</helmet>
+<div class="w">
+  <header class="hdr" aria-hidden="true">
+    <svg width="20" height="20" viewBox="0 0 256 256" fill="#4c9dff"><path d="M224,152v56a16,16,0,0,1-16,16H48a16,16,0,0,1-16-16V152a8,8,0,0,1,16,0v56H208V152a8,8,0,0,1,16,0Zm-101.66,5.66a8,8,0,0,0,11.32,0l40-40a8,8,0,0,0-11.32-11.32L136,132.69V40a8,8,0,0,0-16,0v92.69L93.66,106.34a8,8,0,0,0-11.32,11.32Z"/></svg>
+    <span style="font-size:16px;font-weight:500">LinMediaDownloader</span>
+    <span style="font-size:16px;color:#aab2bd">/ Library</span>
+  </header>
+  <div class="bd" aria-hidden="true">
+    <div class="rail"></div>
+    <div style="width:320px;padding:20px 16px 20px 24px;box-sizing:border-box;display:flex;flex-direction:column;gap:8px;border-right:1px solid #3a4048">
+      <div class="ghost" style="height:36px"></div><div class="ghost" style="height:36px"></div>
+      <div class="ghost" style="height:56px;background:#1f3350;border-color:#4c9dff"></div><div class="ghost" style="height:56px"></div><div class="ghost" style="height:56px"></div><div class="ghost" style="height:56px"></div>
+    </div>
+    <div style="flex:1;padding:20px 24px;display:flex;flex-direction:column;gap:12px">
+      <div style="height:28px;width:260px" class="ghost"></div>
+      <div style="height:36px;width:420px" class="ghost"></div>
+      <div class="ghost" style="flex:1"></div>
+    </div>
+  </div>
+  <div class="scrim">
+    <div class="dlg" role="alertdialog" aria-modal="true" aria-labelledby="dt" aria-describedby="dd">
+      <div class="row" style="align-items:flex-start;gap:16px">
+        <span class="tile"><svg width="24" height="24" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M216,48H176V40a24,24,0,0,0-24-24H104A24,24,0,0,0,80,40v8H40a8,8,0,0,0,0,16h8V208a16,16,0,0,0,16,16H192a16,16,0,0,0,16-16V64h8a8,8,0,0,0,0-16ZM96,40a8,8,0,0,1,8-8h48a8,8,0,0,1,8,8v8H96Zm96,168H64V64H192ZM112,104v64a8,8,0,0,1-16,0V104a8,8,0,0,1,16,0Zm48,0v64a8,8,0,0,1-16,0V104a8,8,0,0,1,16,0Z"/></svg></span>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <h1 class="title" id="dt">Empty the trash for AKIRA OST?</h1>
+          <span id="dd" class="muted">These 3 files (14.6 MB) were deleted from this playlist. Emptying the trash removes them for good; Undo can't bring them back.</span>
+        </div>
+      </div>
+      <div class="files" aria-label="Files that will be removed">
+        <span>Kaneda_theme_Lyrics_xq7m.mp3</span>
+        <span>Tetsuo_Full_Version.mp3</span>
+        <span>Requiem_live_2019.mp3</span>
+      </div>
+      <div class="row" style="justify-content:flex-end;gap:8px">
+        <button class="btn focus">Keep them <span class="kbd">Esc</span></button>
+        <button class="danger">Delete 3 files</button>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1200,"height":800}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>
