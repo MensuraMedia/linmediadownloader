@@ -506,7 +506,8 @@ def main():
     setup_logging()
     icons.register()
     state = "ready" if args.state == "narrow" else args.state
-    app = Gtk.Application(application_id="org.mensuramedia.LinMediaDownloader")
+    # its own id: with the real one, a running app would just be raised and this would exit
+    app = Gtk.Application(application_id="org.mensuramedia.LinMediaDownloader.Shots")
 
     def activate(application):
         window = MainWindow(application)

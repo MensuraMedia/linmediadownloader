@@ -547,3 +547,35 @@ def test_a_video_with_parts_offers_split_and_lists_them(page, monkeypatch):
     monkeypatch.setattr(jobs, "submit_download", lambda url, options: submitted.update(options) or {"status": "queued", "job_id": 3, "position": 1})
     page.start_download()
     assert submitted["split_chapters"] is True
+
+
+def _finish_one_download(page, monkeypatch):
+    snaps = {"current": active_snapshot()}
+    monkeypatch.setattr(jobs, "submit_download", lambda url, options: {"status": "started", "job_id": 21})
+    monkeypatch.setattr(jobs, "status_snapshot", lambda: snaps["current"])
+    page.start_download()
+    wait_until(lambda: page.state == "downloading")
+    snaps["current"] = done_snapshot()
+    wait_until(lambda: page.state == "done")
+
+
+def test_a_link_pasted_after_a_download_brings_back_download(page, monkeypatch):
+    """The user's report: after a finished download, a new link showed no Download button"""
+    calls = read_link(page, monkeypatch)
+    wait_until(lambda: page.state == "ready")
+    _finish_one_download(page, monkeypatch)
+    other = URL + "&next"
+    page.get_display().get_clipboard().set(other)
+    page.another_paste_button.emit("clicked")  # the Paste button in "Download another"
+    wait_until(lambda: page.state == "ready")
+    assert calls[-1] == other  # the new link was read (the fake preview answers with its own URL)
+    assert messages.DOWNLOAD in button_label(page.primary_btn) and page.primary_btn.get_sensitive()
+
+
+def test_typing_in_download_another_reads_it_too(page, monkeypatch):
+    calls = read_link(page, monkeypatch)
+    wait_until(lambda: page.state == "ready")
+    _finish_one_download(page, monkeypatch)
+    page.another_entry.set_text(URL)  # the same link again, typed or Ctrl+V
+    wait_until(lambda: page.state == "ready", timeout=5)
+    assert calls.count(URL) == 2 and messages.DOWNLOAD in button_label(page.primary_btn)

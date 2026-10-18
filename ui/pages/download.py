@@ -510,9 +510,11 @@ class DownloadPage(Gtk.Box):
         )
         self.another_entry.set_hexpand(True)
         self.another_entry.connect("activate", lambda *_a: self._use_another_link())
-        another_paste = kit.button(
+        # typing or Ctrl+V reads the link after a pause, exactly like the Link card's entry
+        self.another_entry.connect("changed", self._on_another_changed)
+        another_paste = self.another_paste_button = kit.button(
             messages.PASTE,
-            on_click=lambda: self._paste_into(self.another_entry),
+            on_click=lambda: self._paste_into(self.another_entry, then=self._use_another_link),
             icon_name="clipboard-text",
         )
         self.another_card.add_row(kit.hbox(self.another_entry, another_paste))
@@ -596,8 +598,13 @@ class DownloadPage(Gtk.Box):
         if not url:
             self._set_empty()
             return
-        if self.preview and self.preview.get("url") == url and not self.preview.get("error"):
-            return  # this link is already shown
+        if (
+            self.state in ("ready", "reading")
+            and self.preview
+            and self.preview.get("url") == url
+            and not self.preview.get("error")
+        ):
+            return  # this link is already shown as a preview
         generation = self._read_generation = self._read_generation + 1
         self.state = "reading"
         self._apply_state()
@@ -988,10 +995,29 @@ class DownloadPage(Gtk.Box):
         self.poller.start()
         logger.info("queued %s (job %s)", url, result.get("job_id"))
 
+    def _on_another_changed(self, *_a):
+        if self._setting_text:
+            return
+        if self._typing_timer is not None:
+            GLib.source_remove(self._typing_timer)
+        self._typing_timer = GLib.timeout_add(TYPE_DELAY_MS, self._another_typed)
+
+    def _another_typed(self):
+        self._typing_timer = None
+        self._use_another_link()
+        return False
+
     def _use_another_link(self):
+        """A link in "Download another": it becomes the Link card's link and is read, so the
+        options and the Download button come back for it"""
         url = self.another_entry.get_text().strip()
-        if url:
-            self.start_read(url)
+        if not url:
+            return
+        self._setting_text = True
+        self.link_entry.set_text(url)
+        self.another_entry.set_text("")
+        self._setting_text = False
+        self.start_read(url)
 
     # ================================================================ snapshots
     def apply_snapshot(self, snap):

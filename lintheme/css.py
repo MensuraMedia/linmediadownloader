@@ -222,6 +222,27 @@ def _gtk4():
 }}
 dropdown.lt-select > button {{ padding: 0 14px; }}
 dropdown.lt-select:disabled {{ color: {C['text_muted']}; }}
+/* GTK 4 list widgets (ListView, ColumnView, GridView) draw in the desktop theme's own
+   "view" greys unless told otherwise: lists sit on the surface of the card that holds
+   them, hover and selection use the theme's tokens, headers are muted text */
+.lt-root listview, .lt-root columnview, .lt-root gridview,
+.lt-root columnview > listview, .lt-root scrolledwindow, .lt-root viewport {{
+  background-color: transparent; color: {C['text']};
+}}
+.lt-root listview > row, .lt-root columnview > listview > row, .lt-root gridview > child {{
+  background-color: transparent; color: {C['text']};
+}}
+.lt-root listview > row:hover, .lt-root columnview > listview > row:hover,
+.lt-root gridview > child:hover {{ background-color: {C['surface_hover']}; }}
+.lt-root listview > row:selected, .lt-root columnview > listview > row:selected,
+.lt-root gridview > child:selected {{ background-color: {C['accent_soft']}; color: {C['text']}; }}
+.lt-root columnview > header > button {{
+  background-image: none; background-color: transparent; box-shadow: none; border: none;
+  border-bottom: 1px solid {C['border']}; color: {C['text_muted']}; padding: 6px 12px;
+}}
+.lt-root columnview > header > button:hover {{ color: {C['text']}; }}
+.lt-root columnview > header > button > box > sort-indicator {{ color: {C['text_muted']}; }}
+.lt-root columnview.column-separators > listview > row > cell {{ border-right: 1px solid {C['border']}; }}
 """
 
 

@@ -13,5 +13,5 @@ Copy this package into an app (the universal rule is copy, not reference), then
 see docs/06-ADOPTING.md.
 """
 
-__version__ = "1.5.2"
+__version__ = "1.5.3"
 THEME = "Graphite Night"
