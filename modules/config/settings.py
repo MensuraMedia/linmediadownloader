@@ -38,6 +38,10 @@ def get_downloads_folder():
     os.makedirs(paths.FALLBACK_DOWNLOADS_DIR, exist_ok=True)
     return paths.FALLBACK_DOWNLOADS_DIR
 
+# "Skip long files" threshold, shared by the download filter, the preview and the
+# playlist tools (7 minutes).
+LONG_SECONDS = 420
+
 # Default download path
 default_download_path = get_downloads_folder()
 

@@ -15,7 +15,7 @@ from modules.download.media import enqueue_download
 
 logger = logging.getLogger('lmd.jobs')
 
-VIDEO_QUALITIES = ('720', '1080')
+VIDEO_QUALITIES = ('480', '720', '1080')
 DEFAULT_VIDEO_QUALITY = '1080'
 
 _QUEUE_FIELDS = ('id', 'url', 'title', 'status', 'download_type', 'playlist_mode', 'queued_at')

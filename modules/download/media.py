@@ -16,6 +16,7 @@ from modules.config.settings import (
     download_queue,
     reset_cancel,
     is_cancel_requested,
+    LONG_SECONDS,
 )
 
 logger = logging.getLogger('lmd.media')
@@ -104,6 +105,28 @@ def get_video_info(url):
             'url': url
         }
 
+def track_key(info_dict):
+    """The key a track is known by in current_download['tracks'] (video id, else title)"""
+    info_dict = info_dict or {}
+    return info_dict.get('id') or info_dict.get('title') or ''
+
+
+def set_track(info_dict, state, progress=None):
+    """Record one track's state: downloading, done, skipped_long or skipped_duplicate.
+
+    Lets a front end show each track's status in words instead of guessing it from
+    which file name is current. Formats merged into one file report 'done' per part;
+    the last report wins, which is the one that matters."""
+    key = track_key(info_dict)
+    if not key:
+        return
+    tracks = current_download.setdefault('tracks', {})
+    entry = tracks.setdefault(key, {'title': (info_dict or {}).get('title', '')})
+    entry['state'] = state
+    if progress is not None:
+        entry['progress'] = progress
+
+
 class DownloadProgress:
     """Progress callback for YT-DLP"""
     def __init__(self, total_files=1, split_pending=False):
@@ -144,6 +167,8 @@ class DownloadProgress:
             else:
                 progress = 0
 
+            set_track(d.get("info_dict"), 'downloading', progress)
+
             # Always provide consistent progress data
             current_download.update({
                 'status': 'downloading',
@@ -164,6 +189,7 @@ class DownloadProgress:
         elif d['status'] == 'finished':
             self.completed_files += 1
             info_dict = d.get("info_dict") or {}
+            set_track(info_dict, 'done', 100)
             self.info = info_dict or self.info
             # Record this download (original title + id) so future runs can dedupe.
             try:
@@ -213,7 +239,7 @@ def download_media(url, output_dir, download_type='audio', playlist_mode='single
                    video_quality='1080'):
     """Download media from YouTube.
 
-    video_quality caps the video resolution ('720' or '1080'); it is ignored for
+    video_quality caps the video resolution ('480', '720' or '1080'); it is ignored for
     audio downloads, which always fetch the best available audio.
     """
     reset_cancel()
@@ -232,6 +258,7 @@ def download_media(url, output_dir, download_type='audio', playlist_mode='single
     current_download['message'] = 'Preparing download...'
     current_download['current_file'] = ''
     current_download['skipped_duplicates'] = 0
+    current_download['tracks'] = {}   # per-track state for the 2.0 track list (see set_track)
     
     # Get video info to check if it's a playlist
     info = get_video_info(url)
@@ -312,11 +339,13 @@ def download_media(url, output_dir, download_type='audio', playlist_mode='single
         def _combined_filter(info_dict, *, incomplete=False):
             if skip_long:
                 dur = info_dict.get('duration')
-                if dur is not None and dur > 420:
+                if dur is not None and dur > LONG_SECONDS:
+                    set_track(info_dict, 'skipped_long')
                     return f"Skipping long file (>7 min): {info_dict.get('title', '')}"
             if ignore_dupes and dedupe.is_duplicate(info_dict):
                 current_download['skipped_duplicates'] = \
                     current_download.get('skipped_duplicates', 0) + 1
+                set_track(info_dict, 'skipped_duplicate')
                 return f"Skipping duplicate: {info_dict.get('title', '')}"
             return None
         ydl_opts['match_filter'] = _combined_filter
@@ -347,7 +376,7 @@ def download_media(url, output_dir, download_type='audio', playlist_mode='single
             height = int(video_quality)
         except (TypeError, ValueError):
             height = 1080
-        if height not in (720, 1080):
+        if height not in (480, 720, 1080):
             height = 1080
         video_output_template = os.path.join(output_dir, '%(title)s.%(ext)s')
         ydl_opts.update({

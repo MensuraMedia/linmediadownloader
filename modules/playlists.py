@@ -86,7 +86,7 @@ MEDIA_EXTS = {
 }
 
 # A "long" file is over 7 minutes
-LONG_SECONDS = 420
+LONG_SECONDS = settings.LONG_SECONDS
 
 # Max characters kept by the "truncate" operation
 TRUNCATE_LEN = 35
