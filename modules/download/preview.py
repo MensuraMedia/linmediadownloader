@@ -112,7 +112,7 @@ def preview_link(url, skip_long=False, ignore_dupes=False):
             result['title'] = info.get('title') or 'Playlist'
             items = [e for e in (info.get('entries') or []) if e]
             # A watch link inside a playlist: name the video it points at ("This video")
-            wanted = re.search(r'[?&]v=([\w-]{6,})', url or '')
+            wanted = re.search(r'[?&]v=([\w-]+)', url or '')
             if wanted and not result['video_title']:
                 hit = next((e for e in items if e.get('id') == wanted.group(1)), None)
                 result['video_title'] = (hit or {}).get('title') or ''
