@@ -72,7 +72,9 @@ def test_progress_hook_raises_when_cancelled():
 def test_progress_hook_finished_marks_completed():
     settings.reset_cancel()
     dp = DownloadProgress(total_files=1)
-    dp.progress_hook({"status": "finished", "filename": "/tmp/song.mp3"})
+    dp.progress_hook({"status": "finished", "filename": "/tmp/song.webm"})
+    assert settings.current_download["status"] == "processing"  # converting: not complete yet
+    dp.postprocessor_hook({"status": "finished", "postprocessor": "MoveFiles", "info_dict": {}})
     assert settings.current_download["status"] == "completed"
     assert settings.current_download["total_progress"] == 100
     assert dp.done is True
@@ -82,7 +84,8 @@ def test_progress_hook_defers_completion_when_splitting():
     """With a split pending, the last file must NOT flip status to 'completed'."""
     settings.reset_cancel()
     dp = DownloadProgress(total_files=1, split_pending=True)
-    dp.progress_hook({"status": "finished", "filename": "/tmp/song.mp3"})
+    dp.progress_hook({"status": "finished", "filename": "/tmp/song.webm"})
+    dp.postprocessor_hook({"status": "finished", "postprocessor": "MoveFiles", "info_dict": {}})
     assert dp.done is True                                  # download really finished
     assert settings.current_download["status"] == "processing"   # but not 'completed' yet
     settings.current_download["status"] = None

@@ -1,11 +1,14 @@
 # ui/widgets/track_list.py
-"""The track rows the preview and the progress views share: number, title, a
-status pill (icon + word), length. Built on Gtk.ListView + Gio.ListStore +
+"""The track rows the preview and the progress views share, in the order the user
+asked for (2026-10-18): status pill (icon + word), name, length, size. Built on
+Gtk.ListView + Gio.ListStore +
 Gtk.SignalListItemFactory so a 500-item playlist stays fast: rows are recycled
 and a poll only touches the items whose status changed.
 
 Row states (TrackItem.state): pending · skip_duplicate · skip_long · waiting ·
-downloading · done · not_downloaded. Dimmed rows are the skipped ones.
+downloading · processing (converting; the source file is still there) · done ·
+not_downloaded. Dimmed rows are the skipped ones. Size: an estimate ("≈ 5.1 MB")
+for audio before the download, the real file size once a track is done.
 """
 
 import gi
@@ -17,8 +20,11 @@ from lintheme import tokens  # noqa: E402
 from lintheme.gtk4 import components as kit  # noqa: E402
 from ui import messages  # noqa: E402
 
+AUDIO_BYTES_PER_SECOND = 192_000 / 8  # the MP3 bitrate the download uses
+
 C = tokens.COLOR
-PILL_WIDE = 190
+PILL_WIDE = 148  # fits "Downloading · 100%"; half the window holds status + name + length + size
+SIZE_CHARS = 8
 COMPACT_HEIGHT = 420
 
 # state -> (icon, message template, pill kind, dim)
@@ -29,12 +35,14 @@ PREVIEW_PILLS = {
 ACTIVE_PILLS = {
     "done": ("check-circle", messages.PILL_DONE, "ok", False),
     "downloading": ("circle-notch", messages.PILL_DOWNLOADING, "busy", False),
+    "processing": ("circle-notch", messages.PILL_CONVERTING, "busy", False),
     "skip_duplicate": ("copy", messages.PILL_SKIP_HAVE, None, True),
     "skip_long": ("clock-counter-clockwise", messages.PILL_SKIP_LONG, "attention", True),
     "not_downloaded": (None, messages.PILL_NOT_DOWNLOADED, "error", False),
     "waiting": (None, messages.PILL_WAITING, None, False),
 }
 _COUNTED = ("done", "downloading", "waiting")
+_IN_PROGRESS = ("downloading", "processing")
 
 
 class TrackItem(GObject.Object):
@@ -45,6 +53,8 @@ class TrackItem(GObject.Object):
     length = GObject.Property(type=str, default="")
     state = GObject.Property(type=str, default="pending")
     progress = GObject.Property(type=float, default=-1.0)
+    size = GObject.Property(type=str, default="")
+    duration = GObject.Property(type=float, default=-1.0)  # seconds, for the size estimate
 
     def set_fields(self, **fields):
         for key, value in fields.items():
@@ -59,46 +69,46 @@ class TrackRow(Gtk.Box):
         super().__init__(spacing=12)
         kit.css(self, "lt-row")
         self._item, self._handlers, self._shown_pct = None, [], None
-        self.number = Gtk.Label(xalign=1.0)
-        self.number.set_width_chars(2)
-        self.number.set_valign(Gtk.Align.CENTER)  # number, title block, pill and length
-        title_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)  # share one centre
+        title_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)  # every cell shares one centre
         title_box.set_valign(Gtk.Align.CENTER)
         self.title = Gtk.Label(xalign=0.0)
         self.title.set_ellipsize(3)  # end: long titles shorten, the length column stays put
         self.title.set_hexpand(True)
         self.bar = Gtk.ProgressBar()
         self.bar.set_hexpand(False)
-        self.bar.set_size_request(180, -1)
+        self.bar.set_size_request(120, -1)
         kit.name(self.bar, "Track progress")
         title_box.append(self.title)
         title_box.append(self.bar)
         self.pill_box = Gtk.Box(spacing=8)
         self.pill_box.set_size_request(PILL_WIDE, -1)
-        self.pill_box.set_halign(Gtk.Align.END)
+        self.pill_box.set_halign(Gtk.Align.START)
         self.pill_box.set_valign(Gtk.Align.CENTER)
         self.length = Gtk.Label(xalign=1.0)
-        self.length.set_width_chars(6)
+        self.length.set_width_chars(7)
         self.length.set_valign(Gtk.Align.CENTER)
-        self.append(self.number)
-        self.append(title_box)
+        self.size = kit.css(Gtk.Label(xalign=1.0), "lt-muted")
+        self.size.set_width_chars(SIZE_CHARS)
+        self.size.set_valign(Gtk.Align.CENTER)
         self.append(self.pill_box)
+        self.append(title_box)
         self.append(self.length)
+        self.append(self.size)
         self.show_state("pending", None)
 
     def bind(self, item):
         self.unbind()
         self._item = item
         for prop, cb in (
-            ("number", self._sync_number),
             ("title", self._sync_title),
+            ("size", self._sync_size),
             ("length", self._sync_length),
             ("state", self._sync_state),
             ("progress", self._sync_progress),
         ):
             self._handlers.append(item.connect(f"notify::{prop}", cb))
-        self._sync_number()
         self._sync_title()
+        self._sync_size()
         self._sync_length()
         self._sync_state()
         self._sync_progress()
@@ -109,8 +119,8 @@ class TrackRow(Gtk.Box):
         self._handlers, self._item = [], None
 
     # -- property callbacks
-    def _sync_number(self, *_a):
-        self.number.set_text(str(self._item.number) if self._item else "")
+    def _sync_size(self, *_a):
+        self.size.set_text(self._item.size if self._item else "")
 
     def _sync_title(self, *_a):
         self.title.set_text(self._item.title if self._item else "")
@@ -178,18 +188,15 @@ class TrackList(Gtk.Box):
         kit.css(self, "lt-card", "lmd-list")
         head = Gtk.Box(spacing=12)
         kit.css(head, "lt-thead")
-        num = Gtk.Label(label=messages.COL_NUM, xalign=1.0)
-        num.set_width_chars(2)
+        status = Gtk.Label(label=messages.COL_STATUS, xalign=0.0)
+        status.set_size_request(PILL_WIDE, -1)
         title = Gtk.Label(label=messages.COL_TITLE, xalign=0.0)
         title.set_hexpand(True)
-        status = Gtk.Label(label=messages.COL_STATUS)
-        status_box = Gtk.Box()
-        status_box.set_size_request(PILL_WIDE, -1)
-        status_box.set_halign(Gtk.Align.END)
-        status_box.append(status)
         length = Gtk.Label(label=messages.COL_LENGTH, xalign=1.0)
-        length.set_width_chars(6)
-        for widget in (num, title, status_box, length):
+        length.set_width_chars(7)
+        size = Gtk.Label(label=messages.COL_SIZE, xalign=1.0)
+        size.set_width_chars(SIZE_CHARS)
+        for widget in (status, title, length, size):
             head.append(widget)
         self.append(head)
 
@@ -207,6 +214,7 @@ class TrackList(Gtk.Box):
         self.scroll.set_min_content_height(120)
         self.append(self.scroll)
         self._keys = []
+        self._audio = True  # estimate sizes for MP3 until told otherwise
         kit.name(self.view, messages.TRACKS)
 
     # -- factory
@@ -230,6 +238,8 @@ class TrackList(Gtk.Box):
                 number=entry.get("index") or len(self._keys) + 1,
                 title=entry.get("title") or "",
                 length=clock(entry.get("duration")),
+                duration=float(entry.get("duration") or -1),
+                size="",
                 state=(
                     "skip_duplicate"
                     if entry.get("skip") == "duplicate"
@@ -239,6 +249,7 @@ class TrackList(Gtk.Box):
             )
             self.store.append(item)
             self._keys.append(entry.get("id") or entry.get("title") or "")
+        self.set_audio_estimates(self._audio)
 
     def set_raw(self, rows):
         """Rows straight from a snapshot's per-track states (no preview to match against)."""
@@ -252,6 +263,7 @@ class TrackList(Gtk.Box):
                 title=track.get("title") or key,
                 state=state if state in ACTIVE_PILLS else "waiting",
                 progress=(track.get("progress") or 0) / 100 if state == "downloading" else -1.0,
+                size=file_size(track.get("size")),
             )
             self.store.append(item)
             self._keys.append(key)
@@ -268,23 +280,48 @@ class TrackList(Gtk.Box):
                     state="downloading",
                     progress=((track.get("progress") or 0) / 100),
                 )
-            elif state in ("done", "skipped_long", "skipped_duplicate"):
+            elif state == "processing":  # downloaded; converting and removing the source
+                item.set_fields(state="processing", progress=-1.0)
+            elif state == "done":
+                real = file_size((track or {}).get("size"))
+                item.set_fields(state="done", progress=100.0, size=real or item.size)
+            elif state in ("skipped_long", "skipped_duplicate"):
                 mapped = {"skipped_long": "skip_long", "skipped_duplicate": "skip_duplicate"}
-                item.set_fields(state=state if state == "done" else mapped[state], progress=100.0)
+                item.set_fields(state=mapped[state], progress=100.0, size="")
             elif final:
                 item.set_fields(state="not_downloaded", progress=-1.0)
             elif item.state in ("pending",):
                 item.set_fields(state="waiting", progress=-1.0)
-            elif item.state == "downloading":
+            elif item.state in _IN_PROGRESS:
                 item.set_fields(state="waiting", progress=-1.0)
         return self.counts()
+
+    def set_audio_estimates(self, audio):
+        """Size column before the download: ≈ length × MP3 bitrate for audio; blank for video
+        (its size depends on the stream YouTube serves). Real sizes replace them when done."""
+        self._audio = audio
+        for i in range(self.store.get_n_items()):
+            item = self.store.get_item(i)
+            if item.state == "done":
+                continue
+            if item.state in ("skip_long", "skip_duplicate"):  # nothing will be saved for these
+                item.set_fields(size="")
+                continue
+            if audio and item.duration > 0:
+                item.set_fields(
+                    size=messages.SIZE_ESTIMATE.format(size=file_size(item.duration * AUDIO_BYTES_PER_SECOND))
+                )
+            else:
+                item.set_fields(size="")
 
     def counts(self):
         """How many rows sit in each state, for the pane's headline counts."""
         found = {"done": 0, "downloading": 0, "waiting": 0, "skip": 0, "not_downloaded": 0, "pending": 0}
         for i in range(self.store.get_n_items()):
             state = self.store.get_item(i).state
-            if state in _COUNTED:
+            if state == "processing":
+                found["downloading"] += 1  # converting is still under way
+            elif state in _COUNTED:
                 found[state] += 1
             elif state in ("skip_long", "skip_duplicate"):
                 found["skip"] += 1
@@ -308,3 +345,15 @@ def clock(seconds):
     h, rest = divmod(seconds, 3600)
     m, s = divmod(rest, 60)
     return f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
+
+
+def file_size(n):
+    """5.1 MB · 31 MB · 1.2 GB; blank when unknown"""
+    if not n or n <= 0:
+        return ""
+    mb = n / 1_000_000
+    if mb >= 1000:
+        return f"{mb / 1000:.1f} GB"
+    if mb >= 10:
+        return f"{round(mb)} MB"
+    return f"{mb:.1f} MB"

@@ -90,8 +90,8 @@ def test_track_states_follow_the_progress_hook(monkeypatch):
     hook({'status': 'downloading', 'filename': '/t/Kaneda.mp3', 'info_dict': info,
           'downloaded_bytes': 50, 'total_bytes': 100})
     assert settings.current_download['tracks']['a1'] == {'title': 'Kaneda', 'state': 'downloading', 'progress': 50}
-    hook({'status': 'finished', 'filename': '/t/Kaneda.mp3', 'info_dict': info})
-    assert settings.current_download['tracks']['a1']['state'] == 'done'
+    hook({'status': 'finished', 'filename': '/t/Kaneda.webm', 'info_dict': info})
+    assert settings.current_download['tracks']['a1']['state'] == 'processing'  # .webm not converted yet
     media.set_track({'title': 'No id'}, 'skipped_long')
     assert settings.current_download['tracks']['No id']['state'] == 'skipped_long'
     media.set_track({}, 'done')  # nothing to key it by: ignored
@@ -120,3 +120,34 @@ def test_480p_is_accepted():
 ])
 def test_mix_links_become_the_single_video(url, expected):
     assert preview.strip_mix(url) == expected
+
+
+def test_a_track_is_done_only_after_the_last_postprocessor(monkeypatch, tmp_path):
+    """Done = converted, source deleted and moved: yt-dlp's MoveFiles step has run"""
+    monkeypatch.setitem(settings.current_download, 'tracks', {})
+    monkeypatch.setattr(dedupe, 'record_download', lambda info: None)
+    tracker = media.DownloadProgress(total_files=2)
+    mp3 = tmp_path / 'Kaneda.mp3'
+    mp3.write_bytes(b'x' * 1234)
+    info = {'id': 'a1', 'title': 'Kaneda', 'filepath': str(mp3)}
+    tracker.progress_hook({'status': 'finished', 'filename': str(tmp_path / 'Kaneda.webm'), 'info_dict': info})
+    tracker.postprocessor_hook({'status': 'finished', 'postprocessor': 'ExtractAudio', 'info_dict': info})
+    assert settings.current_download['tracks']['a1']['state'] == 'processing' and tracker.completed_files == 0
+    tracker.postprocessor_hook({'status': 'finished', 'postprocessor': 'MoveFiles', 'info_dict': info})
+    assert settings.current_download['tracks']['a1'] == {'title': 'Kaneda', 'state': 'done', 'progress': 100, 'size': 1234}
+    assert tracker.completed_files == 1 and not tracker.done
+    info2 = {'id': 'a2', 'title': 'Two', 'filepath': str(mp3)}
+    tracker.postprocessor_hook({'status': 'finished', 'postprocessor': 'MoveFiles', 'info_dict': info2})
+    assert tracker.done and settings.current_download['status'] == 'completed'
+
+
+def test_a_video_and_audio_pair_counts_once(monkeypatch, tmp_path):
+    monkeypatch.setitem(settings.current_download, 'tracks', {})
+    monkeypatch.setattr(dedupe, 'record_download', lambda info: None)
+    tracker = media.DownloadProgress(total_files=1)
+    info = {'id': 'v1', 'title': 'V', 'filepath': str(tmp_path / 'V.mp4')}
+    for part in ('V.f137.mp4', 'V.f140.m4a'):  # 1.x counted each half as a file
+        tracker.progress_hook({'status': 'finished', 'filename': str(tmp_path / part), 'info_dict': info})
+    assert tracker.completed_files == 0
+    tracker.postprocessor_hook({'status': 'finished', 'postprocessor': 'MoveFiles', 'info_dict': info})
+    assert tracker.completed_files == 1 and tracker.done

@@ -35,7 +35,7 @@ logger = logging.getLogger("lmd.ui.download")
 
 C = tokens.COLOR
 TYPE_DELAY_MS = 600  # reading starts this long after typing stops
-OPTIONS_WIDE_W = 456  # the mockups' options column
+OPTIONS_WIDE_W = tokens.LAYOUT["options_min"]  # the options column never gets narrower
 AUDIO_BYTES_PER_SECOND = 24_000  # 192 kbps CBR audio, for "about N MB" estimates
 
 
@@ -252,9 +252,11 @@ class DownloadPage(Gtk.Box):
     # ================================================================ build
     def _build(self):
         content = Gtk.Box()
+        content.set_homogeneous(True)  # options and tracks share the width equally (user, 2026-10-18)
         content.set_hexpand(True)
         content.set_vexpand(True)
         self.left_scroll = kit.scrolled(self._build_left_column())
+        self.left_scroll.set_hexpand(True)
         self.left_scroll.set_size_request(OPTIONS_WIDE_W, -1)
         content.append(self.left_scroll)
         content.append(self._build_right_pane())
@@ -773,18 +775,19 @@ class DownloadPage(Gtk.Box):
         if scope is None:  # a link that was never previewed here: the tracks are the truth
             for key, track in tracks.items():
                 state = track.get("state")
-                if state not in ("done", "downloading", "skipped_long", "skipped_duplicate"):
+                if state not in ("done", "downloading", "processing", "skipped_long", "skipped_duplicate"):
                     state = "waiting"
                 view[key] = {
                     "state": state,
                     "progress": track.get("progress") or 0 if state == "downloading" else -1,
+                    "size": track.get("size"),
                 }
             return view
         for entry in scope:
             key = self._entry_key(entry)
             track = tracks.get(key) or {}
             state = track.get("state")
-            if state not in ("done", "downloading", "skipped_long", "skipped_duplicate"):
+            if state not in ("done", "downloading", "processing", "skipped_long", "skipped_duplicate"):
                 if entry.get("skip") == "long":
                     state = "skipped_long"
                 elif entry.get("skip") == "duplicate":
@@ -794,6 +797,7 @@ class DownloadPage(Gtk.Box):
             view[key] = {
                 "state": state,
                 "progress": track.get("progress") or 0 if state == "downloading" else -1,
+                "size": track.get("size"),
             }
         return view
 
@@ -806,7 +810,7 @@ class DownloadPage(Gtk.Box):
             if state == "done":
                 counts["done"] += 1
                 counts["total"] += 1
-            elif state == "downloading":
+            elif state in ("downloading", "processing"):  # converting still counts as under way
                 counts["downloading"] += 1
                 counts["total"] += 1
             elif state == "skipped_duplicate":
@@ -1358,6 +1362,7 @@ class DownloadPage(Gtk.Box):
 
     def refresh_summaries(self):
         """Everything that depends on the chosen options and the preview's marks"""
+        self.track_list.set_audio_estimates(self.download_type == "audio")
         if self.state not in ("ready", "reading"):
             self._set_pane_counts("")
             return

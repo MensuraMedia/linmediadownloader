@@ -113,8 +113,8 @@ def track_key(info_dict):
     return info_dict.get('id') or info_dict.get('title') or ''
 
 
-def set_track(info_dict, state, progress=None):
-    """Record one track's state: downloading, done, skipped_long or skipped_duplicate.
+def set_track(info_dict, state, progress=None, size=None):
+    """Record one track's state: downloading, processing, done, skipped_long or skipped_duplicate.
 
     Lets a front end show each track's status in words instead of guessing it from
     which file name is current. Formats merged into one file report 'done' per part;
@@ -127,6 +127,8 @@ def set_track(info_dict, state, progress=None):
     entry['state'] = state
     if progress is not None:
         entry['progress'] = progress
+    if size is not None:
+        entry['size'] = size  # bytes of the finished file
 
 
 def record_error(message):
@@ -196,51 +198,66 @@ class DownloadProgress:
                 raise yt_dlp.utils.DownloadCancelled("Download cancelled by user")
         
         elif d['status'] == 'finished':
-            self.completed_files += 1
+            # One download finished: a .webm, or one half of a video+audio pair. The track
+            # is not done yet: conversion, merging and the deletion of the source still run.
+            # postprocessor_hook() marks it done once all of that is over.
             info_dict = d.get("info_dict") or {}
-            set_track(info_dict, 'done', 100)
+            set_track(info_dict, 'processing', 100)
             self.info = info_dict or self.info
-            # Record this download (original title + id) so future runs can dedupe.
-            try:
-                from modules.download import dedupe
-                dedupe.record_download(info_dict)
-            except Exception:
-                pass
             current_download.update({
                 'status': 'processing',
-                'completed_files': self.completed_files,
                 'progress': 100,
                 'duration': info_dict.get("duration"),
                 'message': f"Processing {os.path.basename(d['filename'])}..."
             })
-            
-            # Update total progress for playlist
-            if self.total_files > 1:
-                current_download['total_progress'] = min((self.completed_files * 100) / self.total_files, 100)
-            
-            # Check if this was the last file
-            if self.completed_files >= self.total_files:
-                self.done = True
-                if self.split_pending:
-                    # Don't declare 'completed' yet — the split phase runs next and
-                    # reports its own progress, so the UI keeps polling.
-                    current_download.update({
-                        'status': 'processing',
-                        'total_progress': 100,
-                        'message': 'Downloaded — preparing to split into tracks…'
-                    })
-                else:
-                    current_download.update({
-                        'status': 'completed',
-                        'total_progress': 100,
-                        'message': 'Download completed successfully!'
-                    })
-        
+
         elif d['status'] == 'error':
             current_download.update({
                 'status': 'error',
                 'message': f"Error: {d.get('error', 'Unknown error')}"
             })
+
+    def postprocessor_hook(self, d):
+        """A file is complete only after its last post-processing step.
+
+        yt-dlp runs MoveFiles (MoveFilesAfterDownloadPP) last for every file, after conversion (the
+        .webm becomes an .mp3 and is deleted) or merging. Counting here instead of on
+        the download's 'finished' also stops a video+audio pair counting twice.
+        """
+        if d.get('status') != 'finished' or d.get('postprocessor') != 'MoveFiles':
+            return
+        info_dict = d.get('info_dict') or {}
+        path = info_dict.get('filepath') or ''
+        size = os.path.getsize(path) if path and os.path.isfile(path) else None
+        set_track(info_dict, 'done', 100, size=size)
+        self.completed_files += 1
+        self.info = info_dict or self.info
+        try:  # record it (original title + id) so later runs can skip duplicates
+            from modules.download import dedupe
+            dedupe.record_download(info_dict)
+        except Exception:
+            pass
+        current_download.update({
+            'completed_files': self.completed_files,
+            'message': f"Saved {os.path.basename(path)}" if path else 'Saved',
+        })
+        if self.total_files > 1:
+            current_download['total_progress'] = min((self.completed_files * 100) / self.total_files, 100)
+        if self.completed_files >= self.total_files:
+            self.done = True
+            if self.split_pending:
+                # The split phase runs next and reports its own progress.
+                current_download.update({
+                    'status': 'processing',
+                    'total_progress': 100,
+                    'message': 'Downloaded — preparing to split into tracks…'
+                })
+            else:
+                current_download.update({
+                    'status': 'completed',
+                    'total_progress': 100,
+                    'message': 'Download completed successfully!'
+                })
 
 
 def download_media(url, output_dir, download_type='audio', playlist_mode='single',
@@ -337,6 +354,7 @@ def download_media(url, output_dir, download_type='audio', playlist_mode='single
     ydl_opts = {
         'restrictfilenames': False,  # Don't restrict filenames - we'll sanitize them ourselves
         'progress_hooks': [progress_tracker.progress_hook],
+        'postprocessor_hooks': [progress_tracker.postprocessor_hook],
         'ignoreerrors': True,
         'no_warnings': True,
         'geo_bypass': True,
