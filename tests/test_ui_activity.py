@@ -341,3 +341,17 @@ def test_type_tiles_are_kit_sized_squares(page):
     min_h, nat_h = tile.measure(Gtk.Orientation.VERTICAL, -1)[:2]
     # the kit's lt-icon-tile size (its CSS min size wins over a smaller request); never stretched
     assert min_w == nat_w == min_h == nat_h <= 48
+
+
+def test_history_tile_icon_is_centred():
+    """The music mark sits in the middle of its 40 px tile, not at the left edge"""
+    from ui.pages import activity
+
+    tile = activity._tinted_tile("music-notes", "done")
+    tile.measure(Gtk.Orientation.HORIZONTAL, -1)
+    tile.allocate(40, 40, -1, None)
+    mark = tile.get_first_child()
+    ok, bounds = mark.compute_bounds(tile)
+    centre = bounds.get_x() + bounds.get_width() / 2
+    assert abs(centre - 20) <= 1
+    assert not tile.compute_expand(Gtk.Orientation.HORIZONTAL)  # titles stay beside it, at the left

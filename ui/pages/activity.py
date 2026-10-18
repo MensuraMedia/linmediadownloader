@@ -64,11 +64,15 @@ def _tinted_tile(icon_name, result):
     A fixed size request keeps it square: expanding children let it stretch."""
     tile = kit.css(Gtk.Box(), "lt-icon-tile", RESULT_TILES.get(result))
     tile.set_size_request(40, 40)
+    tile.set_hexpand(False)  # set explicitly: the icon's expand must not spread to the row
+    tile.set_vexpand(False)
     tile.set_halign(Gtk.Align.START)
     tile.set_valign(Gtk.Align.CENTER)
     mark = kit.icon(icon_name, 22, RESULT_TILE_FG.get(result, C["text_muted"]))
     mark.set_halign(Gtk.Align.CENTER)
     mark.set_valign(Gtk.Align.CENTER)
+    mark.set_hexpand(True)  # a Box gives a child only its natural width: it must expand to centre
+    mark.set_vexpand(True)
     tile.append(mark)
     return tile
 
