@@ -3,10 +3,12 @@
 
 ## Session Logs
 <!-- Add newest first -->
+- [2026-10-18 GTK 4 Phases 0–5 handoff](sessions/2026-10-18_gtk4-phases-0-5-handoff.md) — 2.0 state, how to test/render, what's next
 - [2026-07-31 onboarding + optimization](sessions/2026-07-31_onboarding-and-optimization.md) — Applied universal standards; fixed cancel bug, dead code, cleanup
 
 ## Changes
 <!-- Add newest first -->
+- [2026-10-18 Phases 3–5](changes/2026-10-18_phase3-5-activity-library-settings.md) — Activity, Library, Settings; per-process cookie copies; skips count as handled
 - [2026-08-02 deb package](changes/2026-08-02_deb-package.md) — .deb builder (packaging/build-deb.sh); /opt install, launcher, menu, postinst venv
 - [2026-08-02 settings page](changes/2026-08-02_settings-page.md) — User-editable filler words + char replacements; Apply-replacements op; FAQ text-ops
 - [2026-08-02 download queue + pending](changes/2026-08-02_download-queue-pending.md) — Queue links while one runs; Pending page
