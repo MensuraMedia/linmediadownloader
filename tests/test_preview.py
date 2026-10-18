@@ -185,3 +185,36 @@ def test_an_empty_playlist_folder_is_removed(tmp_path):
     for folder in (empty, kept, plain):
         media._remove_if_empty(str(folder))
     assert not empty.exists() and kept.exists() and plain.exists()  # only empty *_playlist folders go
+
+
+def test_inline_timestamps_mark_parts():
+    """Movements marked on one line between symbols (the Beethoven 7th description)"""
+    from modules.download import chapters
+    text = "/.(0:00).........//.(14:42).........///.(23:41).........////.(32:56)\nThe COMPLETE version."
+    segs = chapters.parse_description(text, 2507)
+    assert [(s['start'], s['end'], s['title']) for s in segs] == [
+        (0, 882, ''), (882, 1421, ''), (1421, 1976, ''), (1976, 2507, '')]
+
+
+def test_inline_parser_keeps_readable_titles_and_ignores_prose_times():
+    from modules.download import chapters
+    named = "Tracks: 0:00 Allegro con brio · 14:42 Allegretto · 23:41 Presto"
+    assert [s['title'] for s in chapters.parse_description(named, 2000)] == ['Allegro con brio', 'Allegretto', 'Presto']
+    assert chapters.parse_description("Recorded live, doors at 7:30, encore at 9:45.", 3000) == []  # no 0:00
+    assert chapters.parse_description("0:00 start 99:00 beyond the end", 600) == []
+
+
+def test_preview_reports_a_videos_chapters(fake_extract, monkeypatch):
+    monkeypatch.setattr(preview, '_extract', lambda url: {
+        'id': 'b7', 'title': 'Beethoven - 7th Symphony (Complete) ✔', 'duration': 2507,
+        'description': '/.(0:00)..//.(14:42)..///.(23:41)..////.(32:56)'})
+    p = preview.preview_link('https://www.youtube.com/watch?v=b7')
+    assert [(c['id'], c['start'], c['duration']) for c in p['chapters']] == [
+        ('part-1', 0, 882), ('part-2', 882, 539), ('part-3', 1421, 555), ('part-4', 1976, 531)]
+
+
+def test_watch_link_names_its_video_inside_the_playlist(monkeypatch):
+    monkeypatch.setattr(preview, '_extract', lambda url: PLAYLIST)
+    monkeypatch.setattr(dedupe, '_manifest', [])
+    p = preview.preview_link('https://www.youtube.com/watch?v=a4&list=PL1')
+    assert p['kind'] == 'playlist' and p['video_title'] == 'Tetsuo'

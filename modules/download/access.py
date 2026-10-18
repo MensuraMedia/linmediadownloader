@@ -13,12 +13,14 @@
 #
 # Override with LMD_BROWSER_ACCESS=off (no browser sign-in) — Settings gains a switch later.
 
+import atexit
 import configparser
 import glob
 import logging
 import os
 import shutil
 import sqlite3
+import tempfile
 import time
 from dataclasses import dataclass
 
@@ -248,7 +250,13 @@ class Access:
         """Options to merge into every yt-dlp call that talks to YouTube"""
         opts = {}
         if self.profile:
-            opts["cookiesfrombrowser"] = self.profile.cookies_option()
+            if self.profile.ytdlp_browser == "firefox":
+                # yt-dlp copies only cookies.sqlite; the newest cookies may still be in
+                # cookies.sqlite-wal. Give it a merged copy, made fresh for each call.
+                merged = merged_firefox_profile(self.profile.path)
+                opts["cookiesfrombrowser"] = ("firefox", merged or self.profile.path, None, None)
+            else:
+                opts["cookiesfrombrowser"] = self.profile.cookies_option()
         if self.js_runtime:
             opts["js_runtimes"] = self.js_runtime
         return opts
@@ -259,6 +267,53 @@ class Access:
             "browser": self.profile.browser if self.profile else None,
             "js_runtime": next(iter(self.js_runtime)) if self.js_runtime else None,
         }
+
+
+def _private_dir():
+    """A folder only this user can read, in memory when possible (sign-in cookies go here)"""
+    base = os.environ.get("XDG_RUNTIME_DIR") or tempfile.gettempdir()
+    path = os.path.join(base, "linmediadownloader")
+    os.makedirs(path, mode=0o700, exist_ok=True)
+    os.chmod(path, 0o700)
+    return path
+
+
+def merged_firefox_profile(profile_path):
+    """A copy of a Firefox-family cookie database with its write-ahead log folded in.
+
+    Firefox and LibreWolf write new cookies to cookies.sqlite-wal first and fold them
+    into cookies.sqlite later. YouTube replaces its sign-in cookies from time to time;
+    until the browser folds the log in, the main file still holds the replaced ones,
+    and yt-dlp (which copies only the main file) gets "cookies are no longer valid"
+    and the bot check. Returns the folder of the merged copy, or None on failure.
+    """
+    source = os.path.join(profile_path, "cookies.sqlite")
+    folder = os.path.join(_private_dir(), "cookies")
+    try:
+        os.makedirs(folder, mode=0o700, exist_ok=True)
+        for suffix in ("", "-wal", "-shm"):
+            target = os.path.join(folder, "cookies.sqlite" + suffix)
+            if os.path.exists(target):
+                os.remove(target)
+            if suffix != "-shm" and os.path.exists(source + suffix):
+                shutil.copy2(source + suffix, target)
+                os.chmod(target, 0o600)
+        con = sqlite3.connect(os.path.join(folder, "cookies.sqlite"))
+        try:
+            con.execute("PRAGMA wal_checkpoint(TRUNCATE)")  # fold the log into the file
+        finally:
+            con.close()
+        return folder
+    except (OSError, sqlite3.Error) as e:
+        logger.warning("Could not merge the cookie log of %s (%s); using the profile as is", profile_path, e)
+        return None
+
+
+@atexit.register
+def _remove_private_copy():
+    """Never leave a copy of sign-in cookies behind"""
+    base = os.environ.get("XDG_RUNTIME_DIR") or tempfile.gettempdir()
+    shutil.rmtree(os.path.join(base, "linmediadownloader", "cookies"), ignore_errors=True)
 
 
 _cache = {"at": 0.0, "access": None}

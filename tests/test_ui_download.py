@@ -518,3 +518,32 @@ def test_done_card_names_the_saved_file_and_shows_it(page, monkeypatch, tmp_path
     assert page.done_saved.get_text().startswith("Saved") and page.done_show.get_visible()
     page.done_show.emit("clicked")
     assert shown and shown[0] in page._done_files
+
+
+def test_heading_shows_the_plain_name():
+    assert download_module.display_name("Beethoven - 7th Symphony (Complete) ✔") == "Beethoven - 7th Symphony"
+    assert download_module.display_name("Song [HD] (Official Video)") == "Song"
+    assert download_module.display_name("(Live)") == "(Live)"  # never empty
+
+
+def test_a_video_with_parts_offers_split_and_lists_them(page, monkeypatch):
+    result = {
+        "url": URL, "kind": "video", "title": "Symphony (Complete) ✔", "video_title": "", "error": None,
+        "entries": [{"index": 1, "id": "b7", "title": "Symphony", "duration": 2507, "url": URL, "skip": None}],
+        "chapters": [
+            {"index": i, "id": f"part-{i}", "title": "", "start": s, "end": e, "duration": e - s}
+            for i, (s, e) in enumerate([(0, 882), (882, 1421), (1421, 1976), (1976, 2507)], 1)
+        ],
+    }
+    read_link(page, monkeypatch, result=result)
+    wait_until(lambda: page.state == "ready")
+    assert page.split_row.get_visible() and page.split_row.get_sensitive()  # opened and offered
+    assert page.track_list.store.get_n_items() == 1  # off: one video
+    page.split_row.switch.set_active(True)
+    assert page.split_chapters is True
+    names = [page.track_list.store.get_item(i).title for i in range(page.track_list.store.get_n_items())]
+    assert names == ["Part 1 of 4", "Part 2 of 4", "Part 3 of 4", "Part 4 of 4"]
+    submitted = {}
+    monkeypatch.setattr(jobs, "submit_download", lambda url, options: submitted.update(options) or {"status": "queued", "job_id": 3, "position": 1})
+    page.start_download()
+    assert submitted["split_chapters"] is True

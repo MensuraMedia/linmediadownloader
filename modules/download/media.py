@@ -581,7 +581,8 @@ def download_media(url, output_dir, download_type='audio', playlist_mode='single
 
     # A playlist folder made for this download stays only if something was saved in it.
     _remove_if_empty(output_dir)
-    saved = [t.get('path') for t in (current_download.get('tracks') or {}).values() if t.get('state') == 'done']
+    saved = [t.get('path') for t in (current_download.get('tracks') or {}).values()
+             if t.get('state') == 'done' and t.get('path') and os.path.exists(t['path'])]  # a split removes its source
     errors = current_download.get('errors') or []
     logger.info('Download end: %s | status=%s | %d file(s) saved | %d error(s)%s%s',
                 url, current_download['status'], len(saved), len(errors),
@@ -646,6 +647,7 @@ def _split_into_tracks(output_dir, meta, fallback_title):
     })
 
     def on_progress(i, count, seg_title):
+        set_track({'id': f'part-{i + 1}', 'title': seg_title}, 'processing', 0)
         current_download.update({
             'status': 'processing',
             'current_file': seg_title,
@@ -654,7 +656,11 @@ def _split_into_tracks(output_dir, meta, fallback_title):
             'message': f'Splitting track {i + 1} of {count}…',
         })
 
-    res = split_file(src, segments, tracks_dir, title, on_progress=on_progress)
+    def on_done(i, path):
+        set_track({'id': f'part-{i + 1}'}, 'done', 100, size=os.path.getsize(path), path=path)
+        logger.info('Saved part %d of %d: %s', i + 1, total, path)
+
+    res = split_file(src, segments, tracks_dir, title, on_progress=on_progress, on_done=on_done)
     made = res.get('tracks', 0)
     if made:
         try:

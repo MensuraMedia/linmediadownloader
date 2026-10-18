@@ -11,7 +11,7 @@ import yt_dlp
 
 from modules.config.logging_config import YTDLPLogger
 from modules.config.settings import LONG_SECONDS
-from modules.download import access, dedupe
+from modules.download import access, chapters, dedupe
 
 logger = logging.getLogger('lmd.preview')
 
@@ -111,10 +111,26 @@ def preview_link(url, skip_long=False, ignore_dupes=False):
             result['kind'] = 'playlist'
             result['title'] = info.get('title') or 'Playlist'
             items = [e for e in (info.get('entries') or []) if e]
+            # A watch link inside a playlist: name the video it points at ("This video")
+            wanted = re.search(r'[?&]v=([\w-]{6,})', url or '')
+            if wanted and not result['video_title']:
+                hit = next((e for e in items if e.get('id') == wanted.group(1)), None)
+                result['video_title'] = (hit or {}).get('title') or ''
         else:
             result['title'] = info.get('title') or 'Video'
             items = [info]
+            # Chapters (embedded, or a timestamped tracklist in the description): one
+            # video in several parts, which "Split into chapters" saves as separate files
+            result['chapters'] = [
+                {'index': i, 'id': f'part-{i}', 'title': seg.get('title') or '',
+                 'start': seg.get('start') or 0, 'end': seg.get('end'),
+                 'duration': (seg['end'] - seg['start']) if seg.get('end') is not None else None}
+                for i, seg in enumerate(chapters.chapter_segments(info, info.get('duration')), 1)
+            ]
         result['entries'] = [_entry(i, e, skip_long, ignore_dupes) for i, e in enumerate(items, 1)]
+        logger.info('Read %s: %s "%s", %d entr%s%s', url, result['kind'], result['title'], len(items),
+                    'y' if len(items) == 1 else 'ies',
+                    f", {len(result.get('chapters') or [])} chapters" if result.get('chapters') else '')
     except Exception as e:
         detail = str(e)
         result['error'] = {'kind': classify_error(detail), 'detail': detail}

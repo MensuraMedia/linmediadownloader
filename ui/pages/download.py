@@ -11,6 +11,7 @@ observed here, on the main loop, through the snapshot poller.
 
 import logging
 import os
+import re
 import threading
 import time
 from urllib.parse import urlparse
@@ -109,6 +110,20 @@ def site_name(url):
     if host.endswith("youtube.com") or host == "youtu.be":
         return "YouTube"
     return host or messages.SITE_FALLBACK
+
+
+def display_name(title):
+    """The plain name for the heading above the ring: no symbols (✔, emoji) and no trailing
+    bracketed tags like "(Complete)" or "[HD]", which read like a status there"""
+    import unicodedata
+
+    name = "".join(ch for ch in title or "" if not unicodedata.category(ch).startswith(("So", "Sk", "Cs")))
+    previous = None
+    while previous != name:  # "Title (Complete) [HD]" -> "Title"
+        previous = name
+        name = re.sub(r"\s*[\(\[\{][^\)\]\}]*[\)\]\}]\s*$", "", name).strip()
+    name = re.sub(r"\s+", " ", name).strip(" -–—|·")
+    return name or (title or "").strip()
 
 
 def audio_estimate_mb(entries):
@@ -360,7 +375,9 @@ class DownloadPage(Gtk.Box):
         self.more_link = kit.button(messages.MORE_OPTIONS, on_click=self._toggle_more, kind="link")
         self.more_link.set_halign(Gtk.Align.START)
         box.append(self.more_link)
-        self.split_row = kit.SwitchRow(messages.SPLIT_CHAPTERS, messages.SPLIT_CAPTION, False)
+        self.split_row = kit.SwitchRow(
+            messages.SPLIT_CHAPTERS, messages.SPLIT_CAPTION, False, on_toggle=self._on_split
+        )
         self.split_row.set_visible(False)
         box.append(self.split_row)
         return box
@@ -622,6 +639,7 @@ class DownloadPage(Gtk.Box):
             n=len(result.get("entries") or []) if result.get("kind") == "playlist" else None
         )
         self.state = "ready"
+        self._offer_split()
         self._apply_state()
         self.window.reset_chip()
 
@@ -709,6 +727,35 @@ class DownloadPage(Gtk.Box):
         preview.apply_options(self.preview, self.skip_long, self.ignore_dupes)
         self._refresh_ready()
 
+    def _on_split(self, active):
+        self.split_chapters = bool(active)
+        if self.state == "ready":
+            self._refresh_ready()
+            self.track_list.set_entries(self._scope_entries())
+
+    def _chapters(self):
+        """The parts of a single video (embedded chapters or a description tracklist)"""
+        if not self.preview or self.preview.get("kind") == "playlist":
+            return []
+        return self.preview.get("chapters") or []
+
+    def _offer_split(self):
+        """After a read: a video with parts opens More options and says so; one without
+        parts keeps the switch off and says why"""
+        parts = self._chapters()
+        words = self.split_row.get_first_child().get_last_child()  # the caption under the title
+        if parts:
+            self._more_open = True
+            self.split_row.set_visible(True)
+            self.split_row.set_sensitive(True)
+            if isinstance(words, Gtk.Label):
+                words.set_text(messages.SPLIT_FOUND.format(n=len(parts)))
+        else:
+            self.split_row.switch.set_active(False)
+            self.split_row.set_sensitive(False)
+            if isinstance(words, Gtk.Label):
+                words.set_text(messages.SPLIT_NONE)
+
     def _toggle_more(self):
         self._more_open = not self._more_open
         self.split_row.set_visible(self._more_open)  # stays open until it is closed again
@@ -749,6 +796,19 @@ class DownloadPage(Gtk.Box):
         if not self.preview:
             return []
         entries = self.preview.get("entries") or []
+        parts = self._chapters()
+        if parts and self.split_chapters:  # one video saved as its parts: the parts are the rows
+            n = len(parts)
+            return [
+                {
+                    "index": part["index"],
+                    "id": part["id"],
+                    "title": part.get("title") or messages.PART_NAME.format(i=part["index"], n=n),
+                    "duration": part.get("duration"),
+                    "skip": None,
+                }
+                for part in parts
+            ]
         if self.preview.get("kind") != "playlist" or self.playlist_choice == "single":
             return entries[:1]
         if self.playlist_choice == "first" and self.limit_value:
@@ -1053,12 +1113,21 @@ class DownloadPage(Gtk.Box):
             default=0.0,
         )
         fraction = (done + in_progress) / total if total else 0.0
+        if ((self._active or {}).get("options") or {}).get("split_chapters"):
+            # The rows are the parts, made only after the whole video is downloaded and
+            # converted: that first, longer stage is the first half of the ring.
+            source = [t for key, t in tracks.items() if key not in view]
+            if source:
+                item = source[0]
+                state = item.get("state")
+                first = 1.0 if state == "done" else share({"state": state, "progress": item.get("progress")})
+                fraction = 0.5 * first + 0.5 * (done / total if total else 0.0)
         index = min(done + 1, total) if total else 1
         self.ring.set_progress(fraction, done, total or index)
         self._set_this_skipping(counts["dupes"], counts["long"])
 
         title = snap.get("playlist_title") or (self._active or {}).get("title") or ""
-        self.dl_title.set_text(title)
+        self.dl_title.set_text(display_name(title))
         converting = snap.get("phase") == "converting"
         name = snap.get("current_file") or title
         self.file_name.set_text(messages.CONVERTING_FILE.format(name=name) if converting else name)
@@ -1126,7 +1195,7 @@ class DownloadPage(Gtk.Box):
             size = ""
         word = messages.WORD_TRACK if done == 1 else messages.WORD_TRACKS
         self._set_this_skipping(counts["dupes"], counts["long"])  # the final view, not the last poll
-        self.done_title.set_text(snap.get("playlist_title") or meta.get("title") or "")
+        self.done_title.set_text(display_name(snap.get("playlist_title") or meta.get("title") or ""))
         self._nothing_saved = done == 0
         reason = self._failure_reason(snap) if self._nothing_saved else None
         if self._nothing_saved:  # never dress a failure up as a success
@@ -1362,6 +1431,8 @@ class DownloadPage(Gtk.Box):
                     title=self.preview.get("title") or "",
                     duration=minutes_words(entry.get("duration")),
                 )
+                if self._chapters():
+                    detail += messages.FOUND_PARTS.format(n=len(self._chapters()))
                 words = messages.VIDEO_FOUND
             self._set_link_status(
                 kit.hbox(

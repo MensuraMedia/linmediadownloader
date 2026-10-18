@@ -126,11 +126,14 @@ def test_ydl_options_and_off_switch(tmp_path, monkeypatch):
     monkeypatch.setattr(access, "_home", lambda: str(tmp_path))
     monkeypatch.setattr(access, "running_processes", lambda: set())
     monkeypatch.setattr(access, "find_js_runtime", lambda home=None: {"node": {"path": "/x/node"}})
+    monkeypatch.setenv("XDG_RUNTIME_DIR", str(tmp_path / "run"))  # never the real /run/user
     opts = access.current(refresh=True).ydl_options()
+    merged = str(tmp_path / "run" / "linmediadownloader" / "cookies")
     assert opts == {
-        "cookiesfrombrowser": ("firefox", path, None, None),
+        "cookiesfrombrowser": ("firefox", merged, None, None),  # a merged copy, not the live profile
         "js_runtimes": {"node": {"path": "/x/node"}},
     }
+    assert os.path.isfile(os.path.join(merged, "cookies.sqlite")) and path != merged
     assert access.current().describe() == {"browser": "LibreWolf", "js_runtime": "node"}
     monkeypatch.setenv("LMD_BROWSER_ACCESS", "off")
     assert "cookiesfrombrowser" not in access.current(refresh=True).ydl_options()
@@ -165,3 +168,26 @@ def test_filename_postprocessor_returns_files_then_info(tmp_path, monkeypatch):
     f.write_bytes(b"x")
     files, info = seen["pp"].run({"filepath": str(f)})
     assert files == [] and info["filepath"].endswith("A_b.mp3") and os.path.exists(info["filepath"])
+
+
+def test_merged_copy_includes_cookies_still_in_the_wal(tmp_path, monkeypatch):
+    """Firefox keeps fresh cookies in cookies.sqlite-wal; yt-dlp copies only the main file"""
+    monkeypatch.setenv("XDG_RUNTIME_DIR", str(tmp_path / "run"))
+    profile = tmp_path / "profile"
+    profile.mkdir()
+    db = profile / "cookies.sqlite"
+    con = sqlite3.connect(db)
+    con.execute("PRAGMA journal_mode=WAL")
+    con.execute("PRAGMA wal_autocheckpoint=0")  # keep new rows in the -wal, like a running browser
+    con.execute("CREATE TABLE moz_cookies (host TEXT, name TEXT, expiry INTEGER, lastAccessed INTEGER)")
+    con.execute("INSERT INTO moz_cookies VALUES ('.youtube.com', 'LOGIN_INFO', 1, 1)")
+    con.commit()
+    assert (profile / "cookies.sqlite-wal").stat().st_size > 0  # the rows live in the log
+    snapshot = tmp_path / "main-only.sqlite"
+    snapshot.write_bytes(db.read_bytes())  # what copying only the main file gives
+    assert sqlite3.connect(snapshot).execute("SELECT count(*) FROM sqlite_master").fetchone()[0] == 0
+    merged = access.merged_firefox_profile(str(profile))
+    rows = sqlite3.connect(os.path.join(merged, "cookies.sqlite")).execute("SELECT name FROM moz_cookies").fetchall()
+    assert rows == [("LOGIN_INFO",)]
+    assert oct(os.stat(merged).st_mode & 0o777) == "0o700"
+    con.close()

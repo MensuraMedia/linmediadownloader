@@ -14,6 +14,8 @@ MEDIA_EXTS = {'.mp3', '.m4a', '.mp4', '.webm', '.opus', '.wav', '.flac', '.ogg',
 # A timestamped tracklist line, tolerant of common formats:
 #   "0:00 Title", "1) 3:14 - Title", "12:03 – Artist - Title", "1:02:03 | Title"
 _TS_LINE = re.compile(r'^\s*\d{0,3}[\.\)]?\s*(\d{1,2}:\d{2}(?::\d{2})?)\s*[-–—|:]?\s*(.*)$')
+# Any timestamp inside a line: "/.(0:00)....//.(14:42)" marks movements on one line
+_TS_ANY = re.compile(r'(?<![\d:])(\d{1,2}:\d{2}(?::\d{2})?)(?![\d:])')
 
 
 def parse_timestamp(ts):
@@ -44,6 +46,33 @@ def parse_description(description, duration=None):
         segs.append({'start': start, 'title': title})
         last = start
     if len(segs) < 2:
+        return _parse_inline(description, duration)
+    return _fill_ends(segs, duration)
+
+
+def _parse_inline(description, duration=None):
+    """Timestamps anywhere in the text, e.g. all on one line between symbols.
+
+    Only taken as a tracklist when it looks like one: it starts at 0:00, keeps
+    climbing, has at least two marks and stays inside the video's length; so a
+    stray "meet at 3:30" in prose is not mistaken for chapters. A part's title is
+    the readable text after its timestamp, if any ("" otherwise: named later).
+    """
+    text = description or ''
+    marks = list(_TS_ANY.finditer(text))
+    segs = []
+    last = -1
+    for n, m in enumerate(marks):
+        start = parse_timestamp(m.group(1))
+        if start is None or start <= last or (duration and start >= duration):
+            continue
+        tail = text[m.end(): marks[n + 1].start() if n + 1 < len(marks) else len(text)]
+        tail = tail.split('\n', 1)[0]
+        words = re.sub(r'[^\w\s\'&,-]', ' ', tail)
+        words = re.sub(r'\s+', ' ', words).strip(' -,')
+        segs.append({'start': start, 'title': words if re.search(r'[^\W\d_]', words) else ''})
+        last = start
+    if len(segs) < 2 or segs[0]['start'] > 5:
         return []
     return _fill_ends(segs, duration)
 
@@ -87,7 +116,7 @@ def _unique(out_dir, name, ext):
     return dst
 
 
-def split_file(src_path, segments, out_dir, video_title, reencode=False, on_progress=None):
+def split_file(src_path, segments, out_dir, video_title, reencode=False, on_progress=None, on_done=None):
     """Cut src_path into one file per segment with ffmpeg. Returns {status, tracks}.
 
     on_progress(i, count, title) is called before each segment (for UI updates).
@@ -118,6 +147,11 @@ def split_file(src_path, segments, out_dir, video_title, reencode=False, on_prog
             subprocess.run(cmd, capture_output=True, timeout=600)
             if os.path.isfile(dst) and os.path.getsize(dst) > 0:
                 made += 1
+                if on_done:  # on_done(i, path) after each part is written
+                    try:
+                        on_done(i, dst)
+                    except Exception:
+                        pass
         except Exception:
             pass
     return {'status': 'success', 'tracks': made}

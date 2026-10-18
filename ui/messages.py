@@ -90,6 +90,10 @@ PLAYLIST_FOLDER_NOTE = "A folder named after the playlist is made inside it"
 MORE_OPTIONS = "More options: split chapters"
 SPLIT_CHAPTERS = "Split into chapters"
 SPLIT_CAPTION = "One file per chapter, for long single videos"
+SPLIT_FOUND = "This video has {n} parts: turn this on to save each as its own file"
+SPLIT_NONE = "This video has no chapters or timestamped tracklist to split by"
+FOUND_PARTS = " · {n} parts"
+PART_NAME = "Part {i} of {n}"
 
 # -- preview / tracks pane ------------------------------------------------------
 PREVIEW = "Preview"
