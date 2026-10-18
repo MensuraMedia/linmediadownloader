@@ -14,7 +14,7 @@ import gi
 
 gi.require_version("Gtk", "4.0")
 gi.require_version("Gdk", "4.0")
-from gi.repository import Gdk, Gtk  # noqa: E402
+from gi.repository import Gtk  # noqa: E402
 
 from lintheme import tokens  # noqa: E402
 from lintheme.gtk4 import components as kit  # noqa: E402
@@ -455,7 +455,7 @@ class ActivityPage(Gtk.Box):
 
     def _copy_link(self, url):
         if url:
-            Gdk.Display.get_clipboard().set_text(url, -1)
+            self.get_display().get_clipboard().set(url)
 
     def _remove_entry(self, entry_id):
         history.remove_entry(entry_id)

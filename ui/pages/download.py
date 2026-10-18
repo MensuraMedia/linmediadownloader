@@ -20,7 +20,7 @@ import gi
 
 gi.require_version("Gtk", "4.0")
 gi.require_version("Gdk", "4.0")
-from gi.repository import Gdk, Gio, GLib, Gtk  # noqa: E402
+from gi.repository import Gio, GLib, Gtk  # noqa: E402
 
 from lintheme import tokens  # noqa: E402
 from lintheme.gtk4 import components as kit  # noqa: E402
@@ -692,7 +692,7 @@ class DownloadPage(Gtk.Box):
                 if then is not None:
                     then()
 
-        Gdk.Display.get_clipboard().read_text_async(None, chosen)
+        self.get_display().get_clipboard().read_text_async(None, chosen)
 
     # ================================================================ options
     def _on_format_changed(self, value):

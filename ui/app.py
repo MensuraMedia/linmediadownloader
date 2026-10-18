@@ -8,15 +8,20 @@ shell's Alt+1…Alt+4.
 """
 
 import logging
+import os
 
 import gi
 
 gi.require_version("Gtk", "4.0")
-from gi.repository import Gio, Gtk  # noqa: E402
+from gi.repository import Gdk, Gio, Gtk  # noqa: E402
 
 from ui.window import MainWindow  # noqa: E402
 
 APP_ID = "org.mensuramedia.LinMediaDownloader"
+# The app icon (resources/icons/hicolor/scalable/apps/<APP_ID>.svg). Installed copies live in
+# ~/.local/share/icons (packaging/install-menu.sh); the repo's folder is searched too, so a
+# window started straight from a checkout still shows it in the panel and Alt+Tab.
+ICON_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "resources", "icons")
 logger = logging.getLogger("lmd.ui.app")
 
 
@@ -28,6 +33,10 @@ class App(Gtk.Application):
 
     def do_startup(self):
         Gtk.Application.do_startup(self)
+        display = Gdk.Display.get_default()
+        if display is not None:
+            Gtk.IconTheme.get_for_display(display).add_search_path(ICON_DIR)
+        Gtk.Window.set_default_icon_name(APP_ID)  # panel, Alt+Tab and the window's own icon
         for name, handler, accels in (
             ("download", self._download, ["<Primary>Return"]),
             ("cancel", self._cancel, ["Escape"]),

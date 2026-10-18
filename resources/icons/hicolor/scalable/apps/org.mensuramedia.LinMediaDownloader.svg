@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <!-- LinMediaDownloader app icon, in the Lin* family style (LinFileCopy, LinDriveSpace…):
+       rounded tile + shadow, a bold Phosphor glyph (download-simple), a white badge with a
+       second Phosphor glyph (music-notes). Phosphor Icons v2.0.8, MIT. -->
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#4c9dff"/>
+      <stop offset="1" stop-color="#1f5fbf"/>
+    </linearGradient>
+  </defs>
+  <rect x="16" y="20" width="224" height="224" rx="52" fill="#15487f" opacity="0.35"/>
+  <rect x="16" y="12" width="224" height="224" rx="52" fill="url(#tile)"/>
+  <g transform="translate(46 38) scale(0.62)" fill="#ffffff"><path d="M228,152v56a20,20,0,0,1-20,20H48a20,20,0,0,1-20-20V152a12,12,0,0,1,24,0v52H204V152a12,12,0,0,1,24,0Zm-108.49,8.49a12,12,0,0,0,17,0l40-40a12,12,0,0,0-17-17L140,123V40a12,12,0,0,0-24,0v83L96.49,103.51a12,12,0,0,0-17,17Z"/></g>
+  <circle cx="186" cy="182" r="54" fill="#2a6ece"/><!-- tile-coloured ring: cuts the glyph under the badge -->
+  <circle cx="186" cy="182" r="46" fill="#ffffff"/>
+  <g transform="translate(158 154) scale(0.22)" fill="#1f5fbf"><path d="M215.38,22.54a12,12,0,0,0-10.290-2.18l-128,32A12,12,0,0,0,68,64V167.35A40,40,0,1,0,92,204V121.37l104-26v40A40,40,0,1,0,220,172V32A12,12,0,0,0,215.38,22.54ZM52,220a16,16,0,1,1,16-16A16,16,0,0,1,52,220ZM92,96.63V73.37l104-26V70.63ZM180,188a16,16,0,1,1,16-16A16,16,0,0,1,180,188Z"/></g>
+</svg>

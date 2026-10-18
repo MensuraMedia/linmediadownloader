@@ -35,6 +35,16 @@
   queue_snapshot / clear_finished_jobs / normalize_options`; routes only translate HTTP.
 - Impact: modules/download/jobs.py (new), modules/routes/api.py.
 
+### 2026-10-18: App id org.mensuramedia.LinMediaDownloader names the window, icon and menu entry
+- Reason: The user asked for a proper icon in the panel, Alt+Tab and the program menu. Cinnamon
+  matches a window to its menu entry by WM_CLASS (StartupWMClass) or the GTK application id, and
+  takes the icon from that entry or the window's own icon.
+- Decision: One id everywhere: Gtk.Application id, GLib prgname (so WM_CLASS is the id), the
+  .desktop file name, Icon= and StartupWMClass=, and the hicolor icon name. The icon follows the
+  Lin* family (tile + bold Phosphor glyph + badge); the 1.x Heroicons icon (a foreign icon set) is
+  not used by 2.0 (packaging/build-deb.sh still references it until Phase 6).
+- Impact: resources/icons/hicolor/**, ui/app.py, linmediadownloader.py, packaging/install-menu.sh.
+
 ### 2026-10-18: Focus ring in the accent blue; status pill shows one word
 - Reason: The user saw yellow borders on fields and buttons (the kit's focus colour #ffd75e, which
   GTK 4 shows on a focused entry even after a mouse click) and asked for no yellow borders; and

@@ -78,6 +78,13 @@ def log_uncaught_exceptions():
 
 
 def main(argv=None):
+    from gi.repository import GLib
+
+    from ui.app import APP_ID
+
+    # The window class must be the app id, so the desktop matches windows to the menu
+    # entry (StartupWMClass) and shows its icon in the panel and in Alt+Tab
+    GLib.set_prgname(APP_ID)
     setup_logging()
     log_uncaught_exceptions()
     log_environment()
