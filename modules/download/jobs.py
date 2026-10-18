@@ -12,6 +12,7 @@ from datetime import datetime
 from modules.config import settings
 from modules.config.settings import current_download, download_queue, request_cancel
 from modules.download import preview
+from modules.download import media
 from modules.download.media import enqueue_download
 
 logger = logging.getLogger('lmd.jobs')
@@ -89,6 +90,15 @@ def status_snapshot():
     """Copy of the current download state plus how many jobs are still waiting."""
     data = dict(current_download)
     data['queue_pending'] = sum(1 for j in download_queue if j.get('status') == 'queued')
+    conv = data.get('converting')
+    pct = media.conversion_progress() if conv else None
+    if pct is not None:  # the file being converted: its row and the file bar move with the MP3
+        data['tracks'] = {k: dict(v) for k, v in (data.get('tracks') or {}).items()}
+        track = data['tracks'].get(conv.get('key'))
+        if track is not None and track.get('state') == 'processing':
+            track['progress'] = pct
+        data['phase'] = 'converting'
+        data['progress'] = pct
     return data
 
 

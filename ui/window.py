@@ -7,6 +7,7 @@ Settings stays a placeholder until its phase. The window owns the status chip:
 the link"), so every chip text the app shows stays in one place: ui/messages.py.
 """
 
+import os
 import shutil
 
 import gi
@@ -133,6 +134,15 @@ class MainWindow(DashboardWindow):
             badge.set_margin_top(2)
             badge.set_margin_end(2)
             wrap.add_overlay(badge)
+
+    def open_in_library(self, files, folder):
+        """'Play in Library' after a download: a playlist folder opens as that playlist;
+        a single file in the download folder opens under All files and starts playing"""
+        self.show_page("library")
+        if len(files) == 1 and not os.path.dirname(files[0]).endswith("_playlist"):
+            self.library_page.show_file(files[0])
+        elif folder:
+            self.library_page.select_by_path(folder)
 
     def show_page(self, page_id):
         super().show_page(page_id)

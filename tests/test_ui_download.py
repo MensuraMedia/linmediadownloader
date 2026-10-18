@@ -24,6 +24,7 @@ from lintheme.gtk4.components import accessible_name  # noqa: E402
 from modules.download import dedupe, jobs, preview  # noqa: E402
 from ui import messages  # noqa: E402
 from ui.window import MainWindow  # noqa: E402
+from ui.pages import download as download_module  # noqa: E402
 
 URL = "https://www.youtube.com/playlist?list=PLtest1"
 
@@ -496,3 +497,24 @@ def test_paste_buttons_keep_their_width(page):
     for entry in (page.link_entry, page.queue_entry, page.another_entry):
         paste = entry.get_next_sibling()
         assert not paste.get_hexpand() and not paste.compute_expand(0)
+
+
+def test_done_card_names_the_saved_file_and_shows_it(page, monkeypatch, tmp_path):
+    """The file on disk can be renamed from the title: the card says where it went"""
+    read_link(page, monkeypatch)
+    wait_until(lambda: page.state == "ready")
+    snaps = {"current": active_snapshot()}
+    monkeypatch.setattr(jobs, "submit_download", lambda url, options: {"status": "started", "job_id": 11})
+    monkeypatch.setattr(jobs, "status_snapshot", lambda: snaps["current"])
+    page.start_download()
+    wait_until(lambda: page.state == "downloading")
+    saved = tmp_path / "Beethoven_7th_Symphony_Complete.mp3"
+    finished = done_snapshot()
+    finished["tracks"]["v1"]["path"] = str(saved)
+    snaps["current"] = finished
+    wait_until(lambda: page.state == "done")
+    shown = []
+    monkeypatch.setattr(download_module.file_utils, "show_file", shown.append)
+    assert page.done_saved.get_text().startswith("Saved") and page.done_show.get_visible()
+    page.done_show.emit("clicked")
+    assert shown and shown[0] in page._done_files

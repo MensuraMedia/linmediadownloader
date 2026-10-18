@@ -209,6 +209,7 @@ class DownloadPage(Gtk.Box):
 
         # view state
         self._state_listeners = []
+        self._done_files, self._done_folder = [], ""
         self.state = "empty"  # empty | reading | ready | error | downloading | done
         self.preview = None
         self.preview_error = None
@@ -457,10 +458,16 @@ class DownloadPage(Gtk.Box):
         self.done_stats = kit.text("", "lt-muted")
         self.done_stats.set_halign(Gtk.Align.CENTER)
         self.link_entry.set_hexpand(True)  # Paste buttons keep their natural width
+        self.done_saved = kit.text("", "lt-caption", wrap=True)  # the real file name(s) on disk
+        self.done_saved.set_halign(Gtk.Align.CENTER)
+        self.done_saved.set_selectable(True)
         play = self.done_play = kit.button(
             messages.PLAY_IN_LIBRARY,
-            on_click=lambda: self.window.show_page("library"),
+            on_click=lambda: self.window.open_in_library(self._done_files, self._done_folder),
             icon_name="play",
+        )
+        self.done_show = kit.button(
+            messages.SHOW_FILE, on_click=self._show_done_file, icon_name="folder-open"
         )
         activity = kit.button(
             messages.SEE_IN_ACTIVITY,
@@ -472,7 +479,8 @@ class DownloadPage(Gtk.Box):
             self.done_ring,
             self.done_headline,
             self.done_stats,
-            kit.hbox(play, activity, spacing=8),
+            self.done_saved,
+            kit.hbox(play, self.done_show, activity, spacing=8),
         ):
             self.done_card.add_row(widget)
         box.append(self.done_card)
@@ -787,8 +795,9 @@ class DownloadPage(Gtk.Box):
                     state = "waiting"
                 view[key] = {
                     "state": state,
-                    "progress": track.get("progress") or 0 if state == "downloading" else -1,
+                    "progress": track.get("progress") or 0 if state in ("downloading", "processing") else -1,
                     "size": track.get("size"),
+                    "path": track.get("path"),
                 }
             return view
         for entry in scope:
@@ -804,8 +813,9 @@ class DownloadPage(Gtk.Box):
                     state = "waiting"
             view[key] = {
                 "state": state,
-                "progress": track.get("progress") or 0 if state == "downloading" else -1,
+                "progress": track.get("progress") or 0 if state in ("downloading", "processing") else -1,
                 "size": track.get("size"),
+                "path": track.get("path"),
             }
         return view
 
@@ -1028,22 +1038,36 @@ class DownloadPage(Gtk.Box):
         self.track_list.apply_states(view)
         counts = self._counts_from_view(view)
         total, done = counts["total"], counts["done"]
-        downloading_fraction = max(
-            (item["progress"] / 100 for item in view.values() if item["state"] == "downloading"),
+        audio = ((self._active or {}).get("options") or {}).get("download_type") == "audio"
+
+        def share(item):
+            """How far one track is: for MP3 the download is the first half, the conversion
+            (often the longer part for long recordings) the second, so the ring keeps moving"""
+            p = max(0.0, min(1.0, (item["progress"] or 0) / 100))
+            if item["state"] == "downloading":
+                return p * 0.5 if audio else p
+            return 0.5 + p * 0.5 if audio else 1.0  # processing
+
+        in_progress = max(
+            (share(item) for item in view.values() if item["state"] in ("downloading", "processing")),
             default=0.0,
         )
-        fraction = (done + downloading_fraction) / total if total else 0.0
+        fraction = (done + in_progress) / total if total else 0.0
         index = min(done + 1, total) if total else 1
         self.ring.set_progress(fraction, done, total or index)
         self._set_this_skipping(counts["dupes"], counts["long"])
 
         title = snap.get("playlist_title") or (self._active or {}).get("title") or ""
         self.dl_title.set_text(title)
-        self.file_name.set_text(snap.get("current_file") or title)
+        converting = snap.get("phase") == "converting"
+        name = snap.get("current_file") or title
+        self.file_name.set_text(messages.CONVERTING_FILE.format(name=name) if converting else name)
         pct = snap.get("progress") or 0
-        self.file_pct.set_text(f"{int(pct)}%" if snap.get("status") == "downloading" else "")
+        self.file_pct.set_text(f"{int(pct)}%" if snap.get("status") == "downloading" or converting else "")
         self.file_bar.set_fraction(max(0.0, min(1.0, pct / 100)))
-        if snap.get("status") == "downloading":
+        if converting:
+            self.file_caption.set_text(messages.CONVERTING_CAPTION)
+        elif snap.get("status") == "downloading":
             done_b = fmt_size(snap.get("downloaded_bytes"))
             total_b = fmt_size(snap.get("total_bytes"))
             speed = fmt_speed(snap.get("speed"))
@@ -1137,6 +1161,21 @@ class DownloadPage(Gtk.Box):
         self._apply_state()
         folder = options.get("output_dir") or snap.get("output_path") or ""
         self._done_folder = folder
+        self._done_files = [
+            item["path"] for item in view.values() if item["state"] == "done" and item.get("path")
+        ]
+        if len(self._done_files) == 1:
+            self.done_saved.set_text(messages.SAVED_AS.format(name=os.path.basename(self._done_files[0])))
+        elif self._done_files:
+            where = os.path.dirname(self._done_files[0])
+            self.done_saved.set_text(
+                messages.SAVED_FILES.format(n=len(self._done_files), folder=tilde(where))
+            )
+        else:
+            self.done_saved.set_text("")
+        self.done_saved.set_visible(bool(self._done_files))
+        self.done_show.set_visible(bool(self._done_files))
+        logger.info("download result: %d saved: %s", len(self._done_files), self._done_files)
         if self._nothing_saved:
             head = messages.AB_NOTHING.format(time=elapsed) if elapsed else messages.AB_NOTHING_NO_TIME
             caption = reason["body"] if reason else self._done_caption(counts, missing)
@@ -1177,6 +1216,13 @@ class DownloadPage(Gtk.Box):
             messages.ACCESS_SIGNED_IN.format(browser=browser) if browser else messages.ACCESS_NONE
         )
         self.access_note.set_visible(True)
+
+    def _show_done_file(self):
+        """Open the folder with the saved file selected (the first, for a playlist)"""
+        if self._done_files:
+            file_utils.show_file(self._done_files[0])
+        elif self._done_folder:
+            file_utils.open_folder(self._done_folder)
 
     def _retry_download(self):
         """Run the same download again (after switching VPN server, for example)"""

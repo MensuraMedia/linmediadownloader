@@ -113,7 +113,7 @@ def track_key(info_dict):
     return info_dict.get('id') or info_dict.get('title') or ''
 
 
-def set_track(info_dict, state, progress=None, size=None):
+def set_track(info_dict, state, progress=None, size=None, path=None):
     """Record one track's state: downloading, processing, done, skipped_long or skipped_duplicate.
 
     Lets a front end show each track's status in words instead of guessing it from
@@ -129,6 +129,29 @@ def set_track(info_dict, state, progress=None, size=None):
         entry['progress'] = progress
     if size is not None:
         entry['size'] = size  # bytes of the finished file
+    if path is not None:
+        entry['path'] = path  # where the finished file was saved (after renaming)
+
+
+AUDIO_BITRATE = 192  # kbit/s: FFmpegExtractAudio's preferredquality below
+AUDIO_BYTES_PER_SECOND = AUDIO_BITRATE * 1000 / 8
+
+
+def conversion_progress():
+    """0-100 for the file being converted to MP3, from its size so far, or None.
+
+    ffmpeg reports no progress through yt-dlp, and a long recording can take a
+    minute to convert after a few seconds of downloading; the growing .mp3 against
+    length x bitrate is a close, honest measure (the encoder is constant-bitrate).
+    """
+    conv = current_download.get('converting')
+    if not conv or not conv.get('expected'):
+        return None
+    try:
+        size = os.path.getsize(conv['target'])
+    except OSError:
+        return 0.0
+    return min(99.0, size * 100.0 / conv['expected'])
 
 
 def record_error(message):
@@ -224,12 +247,29 @@ class DownloadProgress:
         .webm becomes an .mp3 and is deleted) or merging. Counting here instead of on
         the download's 'finished' also stops a video+audio pair counting twice.
         """
+        info_dict = d.get('info_dict') or {}
+        if d.get('status') == 'started' and d.get('postprocessor') == 'ExtractAudio':
+            source = info_dict.get('filepath') or ''
+            duration = info_dict.get('duration') or 0
+            target = os.path.splitext(source)[0] + '.mp3'
+            if (current_download.get('converting') or {}).get('target') == target:
+                return  # yt-dlp reports the same start more than once
+            current_download['converting'] = {
+                'key': track_key(info_dict),
+                'target': target,
+                'expected': duration * AUDIO_BYTES_PER_SECOND,
+            }
+            set_track(info_dict, 'processing', 0)
+            current_download['message'] = f"Converting {os.path.basename(source)} to MP3"
+            logger.info('Converting to MP3: %s (%s s)', source, duration)
+            return
         if d.get('status') != 'finished' or d.get('postprocessor') != 'MoveFiles':
             return
-        info_dict = d.get('info_dict') or {}
+        current_download.pop('converting', None)
         path = info_dict.get('filepath') or ''
         size = os.path.getsize(path) if path and os.path.isfile(path) else None
-        set_track(info_dict, 'done', 100, size=size)
+        set_track(info_dict, 'done', 100, size=size, path=path)
+        logger.info('Saved %s (%s bytes)', path, size)
         self.completed_files += 1
         self.info = info_dict or self.info
         try:  # record it (original title + id) so later runs can skip duplicates
@@ -286,6 +326,11 @@ def download_media(url, output_dir, download_type='audio', playlist_mode='single
     current_download['skipped_duplicates'] = 0
     current_download['tracks'] = {}   # per-track state for the 2.0 track list (see set_track)
     current_download['errors'] = []   # yt-dlp error lines, newest last (see record_error)
+    current_download.pop('converting', None)
+    logger.info('Download start: %s | type=%s mode=%s quality=%s limit=%s skip_long=%s '
+                'ignore_dupes=%s split=%s | to %s | yt-dlp %s | access %s',
+                url, download_type, playlist_mode, video_quality, limit, skip_long, ignore_dupes,
+                split_chapters, output_dir, yt_dlp.version.__version__, access.current().describe())
     
     # Get video info to check if it's a playlist
     info = get_video_info(url)
@@ -534,8 +579,29 @@ def download_media(url, output_dir, download_type='audio', playlist_mode='single
         current_download['status'] = 'error'
         current_download['message'] = f'Error: {str(e)}'
 
+    # A playlist folder made for this download stays only if something was saved in it.
+    _remove_if_empty(output_dir)
+    saved = [t.get('path') for t in (current_download.get('tracks') or {}).values() if t.get('state') == 'done']
+    errors = current_download.get('errors') or []
+    logger.info('Download end: %s | status=%s | %d file(s) saved | %d error(s)%s%s',
+                url, current_download['status'], len(saved), len(errors),
+                ''.join(f'\n    saved: {path}' for path in saved),
+                ''.join(f'\n    error: {err[:300]}' for err in errors[-5:]))
+
     # Record the final outcome against the links-history entry (all exit paths).
     update_last_link_history(status=current_download['status'])
+
+
+def _remove_if_empty(folder):
+    """Remove a "<name>_playlist" folder the download made and left empty"""
+    if not folder or not folder.endswith('_playlist') or not os.path.isdir(folder):
+        return
+    try:
+        if not os.listdir(folder):
+            os.rmdir(folder)
+            logger.info('Removed empty folder %s (nothing was saved in it)', folder)
+    except OSError as e:
+        logger.warning('Could not remove empty folder %s: %s', folder, e)
 
 
 def _split_into_tracks(output_dir, meta, fallback_title):

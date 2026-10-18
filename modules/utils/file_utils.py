@@ -5,6 +5,9 @@
 import os
 import re
 import subprocess
+import logging
+
+logger = logging.getLogger('lmd.files')
 
 def sanitize_filename(filename):
     """Sanitize filenames: 
@@ -58,3 +61,26 @@ def open_folder(folder_path):
         return {"status": "success"}
     except Exception as e:
         return {"status": "error", "message": f"Error opening folder: {str(e)}"}
+
+
+def show_file(file_path):
+    """Open the file manager at a file with the file selected.
+
+    Uses the freedesktop FileManager1 D-Bus interface (Nemo, Nautilus, Dolphin…);
+    falls back to opening the folder when no file manager answers.
+    """
+    file_path = os.path.abspath(file_path)
+    try:
+        from urllib.parse import quote
+        uri = 'file://' + quote(file_path)
+        subprocess.run(
+            ['gdbus', 'call', '--session', '--dest', 'org.freedesktop.FileManager1',
+             '--object-path', '/org/freedesktop/FileManager1',
+             '--method', 'org.freedesktop.FileManager1.ShowItems', f"['{uri}']", ''],
+            check=True, capture_output=True, timeout=5,
+        )
+        logger.info('Showed %s in the file manager', file_path)
+        return {"status": "success"}
+    except Exception as e:
+        logger.info('FileManager1 could not show %s (%s); opening its folder', file_path, e)
+        return open_folder(os.path.dirname(file_path))

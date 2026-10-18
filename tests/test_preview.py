@@ -134,7 +134,8 @@ def test_a_track_is_done_only_after_the_last_postprocessor(monkeypatch, tmp_path
     tracker.postprocessor_hook({'status': 'finished', 'postprocessor': 'ExtractAudio', 'info_dict': info})
     assert settings.current_download['tracks']['a1']['state'] == 'processing' and tracker.completed_files == 0
     tracker.postprocessor_hook({'status': 'finished', 'postprocessor': 'MoveFiles', 'info_dict': info})
-    assert settings.current_download['tracks']['a1'] == {'title': 'Kaneda', 'state': 'done', 'progress': 100, 'size': 1234}
+    assert settings.current_download['tracks']['a1'] == {'title': 'Kaneda', 'state': 'done', 'progress': 100,
+                                                        'size': 1234, 'path': str(mp3)}
     assert tracker.completed_files == 1 and not tracker.done
     info2 = {'id': 'a2', 'title': 'Two', 'filepath': str(mp3)}
     tracker.postprocessor_hook({'status': 'finished', 'postprocessor': 'MoveFiles', 'info_dict': info2})
@@ -151,3 +152,36 @@ def test_a_video_and_audio_pair_counts_once(monkeypatch, tmp_path):
     assert tracker.completed_files == 0
     tracker.postprocessor_hook({'status': 'finished', 'postprocessor': 'MoveFiles', 'info_dict': info})
     assert tracker.completed_files == 1 and tracker.done
+
+
+def test_conversion_progress_follows_the_growing_mp3(monkeypatch, tmp_path):
+    from modules.download import jobs
+    monkeypatch.setitem(settings.current_download, 'tracks', {})
+    monkeypatch.setitem(settings.current_download, 'status', 'processing')
+    tracker = media.DownloadProgress(total_files=1)
+    webm = tmp_path / 'Song.webm'
+    info = {'id': 's1', 'title': 'Song', 'filepath': str(webm), 'duration': 100}  # 100 s -> 2.4 MB of MP3
+    tracker.postprocessor_hook({'status': 'started', 'postprocessor': 'ExtractAudio', 'info_dict': info})
+    assert settings.current_download['tracks']['s1']['state'] == 'processing'
+    assert jobs.status_snapshot()['progress'] == 0.0  # nothing written yet
+    (tmp_path / 'Song.mp3').write_bytes(b'x' * 1_200_000)
+    snap = jobs.status_snapshot()
+    assert snap['phase'] == 'converting' and round(snap['progress']) == 50
+    assert round(snap['tracks']['s1']['progress']) == 50
+    assert settings.current_download['tracks']['s1']['progress'] == 0  # the shared state is not touched
+    tracker.postprocessor_hook({'status': 'finished', 'postprocessor': 'MoveFiles',
+                                'info_dict': {**info, 'filepath': str(tmp_path / 'Song.mp3')}})
+    assert 'converting' not in settings.current_download
+
+
+def test_an_empty_playlist_folder_is_removed(tmp_path):
+    empty = tmp_path / 'Mix_x_playlist'
+    empty.mkdir()
+    kept = tmp_path / 'Kept_playlist'
+    kept.mkdir()
+    (kept / 'a.mp3').write_bytes(b'x')
+    plain = tmp_path / 'Downloads'
+    plain.mkdir()
+    for folder in (empty, kept, plain):
+        media._remove_if_empty(str(folder))
+    assert not empty.exists() and kept.exists() and plain.exists()  # only empty *_playlist folders go

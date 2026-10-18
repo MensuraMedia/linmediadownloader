@@ -42,7 +42,7 @@ ACTIVE_PILLS = {
     "waiting": (None, messages.PILL_WAITING, None, False),
 }
 _COUNTED = ("done", "downloading", "waiting")
-_IN_PROGRESS = ("downloading", "processing")
+_IN_PROGRESS = ("downloading", "processing")  # both show a bar and a percentage
 
 
 class TrackItem(GObject.Object):
@@ -136,14 +136,14 @@ class TrackRow(Gtk.Box):
         if not self._item:
             return
         fraction = self._item.progress
-        downloading = self._item.state == "downloading" and fraction is not None and fraction >= 0
+        downloading = self._item.state in _IN_PROGRESS and fraction is not None and fraction >= 0
         self.bar.set_visible(downloading)
         if downloading:
             self.bar.set_fraction(max(0.0, min(1.0, fraction)))
             pct = int(fraction * 100)
             if pct != self._shown_pct:  # keep the pill's percent words moving with the bar
                 self._shown_pct = pct
-                icon_name, template, kind, _dim = ACTIVE_PILLS["downloading"]
+                icon_name, template, kind, _dim = ACTIVE_PILLS[self._item.state]
                 self._rebuild_pill(icon_name, template, kind, self._item)
 
     # -- one row's look for a state
@@ -155,7 +155,7 @@ class TrackRow(Gtk.Box):
         if dim:
             kit.css(self, "lmd-dim")
         self._rebuild_pill(icon_name, template, kind, item)
-        self._shown_pct = int((item.progress or 0) * 100) if item and state == "downloading" else None
+        self._shown_pct = int((item.progress or 0) * 100) if item and state in _IN_PROGRESS else None
         self._sync_progress()
 
     def _rebuild_pill(self, icon_name, template, kind, item):
@@ -281,7 +281,7 @@ class TrackList(Gtk.Box):
                     progress=((track.get("progress") or 0) / 100),
                 )
             elif state == "processing":  # downloaded; converting and removing the source
-                item.set_fields(state="processing", progress=-1.0)
+                item.set_fields(state="processing", progress=((track.get("progress") or 0) / 100))
             elif state == "done":
                 real = file_size((track or {}).get("size"))
                 item.set_fields(state="done", progress=100.0, size=real or item.size)

@@ -515,6 +515,19 @@ class LibraryPage(Gtk.Box):
             self.selected = None
             self.right_stack.set_visible_child_name("empty")
 
+    def show_file(self, path, play=True):
+        """All files, narrowed to this one file by the search, and (by default) playing it"""
+        self.view_mode = "all"
+        self.view_seg.set_value("all")
+        self.search.set_text(os.path.basename(path))  # the search handler repaints the list
+        self._apply_view()
+        if not play:
+            return
+        store, playlist_name = self._context()
+        entries, index = self._entries_for(store, playlist_name, focus=path)
+        if entries and any(entry[0] == path for entry in entries):
+            self.player.play_list(entries, index)
+
     def select_by_path(self, path):
         """Show this folder (used by 'Play in Library' after a download); an empty
         path just keeps whatever is selected"""
