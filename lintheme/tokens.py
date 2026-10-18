@@ -27,7 +27,7 @@ COLOR = {
     "accent_hover": "#6aaeff",  # hovered primary button
     "on_accent": "#0b1320",  # text on accent
     "accent_soft": "#1f3350",  # selected nav item, icon tiles
-    "focus": "#ffd75e",  # focus ring
+    "focus": "#4c9dff",  # focus ring (app change: the accent blue, not the kit's yellow; user, 2026-10-18)
     "ok": "#5fd38d",
     "ok_bg": "#1d3a2a",
     "busy": "#7cb7ff",

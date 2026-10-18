@@ -18,11 +18,11 @@ PAGE_SETTINGS = "Settings"
 COMING_LATER = "Coming in a later 2.0 phase"
 
 # -- header chip (window.chip.set_status(text, key)) ----------------------------
-CHIP_TOOLS_OK = "yt-dlp and ffmpeg · Ready"
+CHIP_TOOLS_OK = "Ready · yt-dlp and ffmpeg found"
 CHIP_TOOLS_NO_YTDLP = "Needs you · yt-dlp is missing"
 CHIP_TOOLS_NO_FFMPEG = "Needs you · ffmpeg is missing"
-CHIP_READING = "Busy · reading the link"
-CHIP_DOWNLOADING = "Busy · downloading {i} of {M}"
+CHIP_READING = "Reading · the link"
+CHIP_DOWNLOADING = "Downloading · {i} of {M}"
 CHIP_CANT_REACH = "Can't reach · {site}"
 # Which browser sign-in yt-dlp uses (modules/download/access.py picks it by itself)
 ACCESS_SIGNED_IN = "Signed in to YouTube through {browser}"

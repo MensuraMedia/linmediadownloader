@@ -3,7 +3,7 @@
 with this app's four destinations. Download is the real page; Activity, Library
 and Settings are placeholders until their phases. The window owns the status chip:
 `window.chip.set_status(text, key)` takes the whole sentence and a kit status key
-(the kit's own chip composes "device · word", which cannot say "Busy · reading
+(the kit's own chip composes "device · word", which cannot say "Reading ·
 the link"), so every chip text the app shows stays in one place: ui/messages.py.
 """
 
@@ -40,9 +40,9 @@ class AppStatusChip(kit.StatusChip):
     """The kit's chip, with set_status(text, key) taking the full sentence.
 
     Reuses the kit's lt-chip styling, status icons and accessible-name bookkeeping;
-    only the wording differs (word first, then the detail: "Busy · downloading 2 of 7").
-    In a narrow window the chip shows the status word alone; the full sentence stays
-    as the tooltip and the accessible name.
+    only the wording differs (word first, then the detail: "Downloading · 2 of 7").
+    The pill shows the first word of the sentence only ("Ready", "Downloading"); the full
+    sentence stays as the tooltip and the accessible name.
     """
 
     def __init__(self, *args, **kwargs):
@@ -70,7 +70,9 @@ class AppStatusChip(kit.StatusChip):
             self._box.remove(child)
             child = nxt
         self._box.append(kit.status_icon(key, 18))
-        shown = status.status(key).word if self._compact else text
+        # The pill shows only the word that starts each sentence ("Ready", "Downloading");
+        # the whole sentence stays as tooltip and accessible name.
+        shown = text.split(" · ", 1)[0] or status.status(key).word
         words = Gtk.Label(label=shown)
         words.set_ellipsize(2)  # middle: keeps the status word and the start of the detail
         words.set_max_width_chars(40)

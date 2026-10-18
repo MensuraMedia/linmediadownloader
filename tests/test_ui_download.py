@@ -169,6 +169,12 @@ def test_first_launch_shows_an_empty_ready_page(page):
 
 
 def window_chip_text(page):
+    """The chip's full sentence (tooltip and accessible name)"""
+    return page.window.chip.get_tooltip_text()
+
+
+def window_chip_word(page):
+    """What the pill shows: the status word only"""
     return page.window.chip.get_child().get_first_child().get_next_sibling().get_text()
 
 
@@ -241,7 +247,8 @@ def test_download_runs_and_finishes(page, monkeypatch, tmp_path):
     assert page.primary_btn.get_sensitive()
     assert messages.CANCEL in button_label(page.primary_btn)
     assert "Downloading 2 of 2" in page.actionbar._busy_words.get_text()
-    assert "Busy · downloading 2 of 2" in window_chip_text(page)
+    assert "Downloading · 2 of 2" in window_chip_text(page)
+    assert window_chip_word(page) == "Downloading"
 
     snaps["current"] = done_snapshot()
     wait_until(lambda: page.state == "done")
@@ -402,13 +409,14 @@ def test_narrow_layout_folds_the_preview_into_the_strip(window, page, monkeypatc
     assert page.strip_button.get_child().get_text() == messages.HIDE_LIST
 
 
-def test_compact_chip_shows_the_word_and_keeps_the_sentence(window, page, monkeypatch):
+def test_chip_shows_the_word_and_keeps_the_sentence(window, page, monkeypatch):
     read_link(page, monkeypatch)
     wait_until(lambda: page.state == "ready")
     full = window_chip_text(page)
+    assert window_chip_word(page) == "Ready"  # wide or narrow: the status word alone
     window.set_default_size(720, 800)
     assert window._mode == "compact"
-    assert window_chip_text(page) == "Ready"  # the status word alone, no squeezing
+    assert window_chip_word(page) == "Ready"
     chip = page.window.chip
     assert chip.get_tooltip_text() == full
     assert accessible_name(chip) == f"Status: {full}"
@@ -431,7 +439,7 @@ def test_counts_agree_when_the_download_finds_more_duplicates(page, monkeypatch)
     monkeypatch.setattr(jobs, "status_snapshot", lambda: snap)
     page.start_download()
     wait_until(lambda: page.state == "downloading")
-    assert "Busy · downloading 1 of 1" in window_chip_text(page)
+    assert "Downloading · 1 of 1" in window_chip_text(page)
     assert "1 of 1 files" in accessible_name(page.ring)
     assert "Downloading 1 of 1" in page.actionbar._busy_words.get_text()
     assert page.this_skip_label.get_text() == "2 you have · 1 over 7 min"
