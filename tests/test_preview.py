@@ -79,7 +79,8 @@ def test_classify_error(text, kind):
 
 def test_long_threshold_is_shared():
     from modules import playlists
-    assert preview.LONG_SECONDS == media.LONG_SECONDS == playlists.LONG_SECONDS == settings.LONG_SECONDS == 420
+    assert playlists.LONG_SECONDS == settings.LONG_SECONDS == 420  # the default
+    assert settings.long_seconds() == 420  # the live value (Settings: "Long" means … min)
 
 
 def test_track_states_follow_the_progress_hook(monkeypatch):

@@ -14,7 +14,46 @@ logger = logging.getLogger('lmd.settings')
 # The app is localhost-only, but a hardcoded secret is still poor practice.
 SECRET_KEY = os.environ.get('SECRET_KEY') or os.urandom(24).hex()
 
-# Get the system's Downloads folder path
+DEFAULT_FOLDER_NAME = 'LinMediaDownloads'
+
+
+def _xdg_user_dir(key, fallback):
+    """A folder from ~/.config/user-dirs.dirs (XDG_MUSIC_DIR, XDG_DOWNLOAD_DIR…), localised"""
+    xdg_config_home = os.environ.get('XDG_CONFIG_HOME') or os.path.join(os.path.expanduser('~'), '.config')
+    try:
+        with open(os.path.join(xdg_config_home, 'user-dirs.dirs')) as f:
+            for line in f:
+                if line.startswith(key + '='):
+                    return line.split('=', 1)[1].strip().strip('"').replace('$HOME', os.path.expanduser('~'))
+    except OSError:
+        pass
+    return os.path.join(os.path.expanduser('~'), fallback)
+
+
+def default_download_folder():
+    """~/Music/LinMediaDownloads (the user's own Music folder, whatever its name)"""
+    return os.path.join(_xdg_user_dir('XDG_MUSIC_DIR', 'Music'), DEFAULT_FOLDER_NAME)
+
+
+def download_folder(create=True):
+    """Where downloads go: the folder chosen in Settings, else the default"""
+    from modules.config import user_settings
+    folder = user_settings.get_settings().get('download_folder') or default_download_folder()
+    if create:
+        try:
+            os.makedirs(folder, exist_ok=True)
+        except OSError as e:
+            logger.error('Cannot create the download folder %s: %s', folder, e)
+    return folder
+
+
+def long_seconds():
+    """The "Skip long files" limit in seconds (Settings: "Long" means … min)"""
+    from modules.config import user_settings
+    return int(user_settings.get_settings().get('long_minutes') or 7) * 60
+
+
+# 1.x's choice of folder, kept for reference: the system Downloads folder
 def get_downloads_folder():
     """Get the path to the user's Downloads folder"""
     # Try to use the XDG_DOWNLOAD_DIR environment variable first
@@ -38,12 +77,29 @@ def get_downloads_folder():
     os.makedirs(paths.FALLBACK_DOWNLOADS_DIR, exist_ok=True)
     return paths.FALLBACK_DOWNLOADS_DIR
 
-# "Skip long files" threshold, shared by the download filter, the preview and the
-# playlist tools (7 minutes).
+# The default "Skip long files" threshold (7 minutes); the live value is long_seconds().
 LONG_SECONDS = 420
 
-# Default download path
-default_download_path = get_downloads_folder()
+# Where downloads go (Settings can change it; kept current by _follow_settings below).
+default_download_path = download_folder(create=False)
+
+
+_followed_folder = None
+
+
+def _follow_settings(new):
+    """Follow a change of the download folder setting, and only that (a save of the
+    tidy-name words must not reset a folder chosen elsewhere)"""
+    global default_download_path, _followed_folder
+    chosen = new.get('download_folder') or ''
+    if chosen != _followed_folder:
+        _followed_folder = chosen
+        default_download_path = download_folder(create=False)
+
+
+from modules.config import user_settings as _user_settings  # noqa: E402  (no import cycle)
+_followed_folder = _user_settings.get_settings().get('download_folder') or ''
+_user_settings.on_change(_follow_settings)
 
 # Global state variables
 download_history = []

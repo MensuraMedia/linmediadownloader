@@ -277,10 +277,12 @@ def rename_playlist(path, new_name):
     return {'status': 'success', 'path': new_path, 'name': new_name}
 
 
-def delete_long_files(path, max_seconds=LONG_SECONDS, record=True):
+def delete_long_files(path, max_seconds=None, record=True):
     """Move media files longer than max_seconds into a .trash folder (undoable)."""
     if not _is_safe_path(path) or not os.path.isdir(path):
         return {'status': 'error', 'message': 'Invalid playlist path'}
+    if max_seconds is None:
+        max_seconds = settings.long_seconds()  # Settings: "Long" means … min
     trash = os.path.join(path, '.trash')
     moves = []
     for name in _media_files(path):
@@ -660,7 +662,7 @@ def preview_operation(path, operation):
         planned = []
         for name in files:
             duration = _duration(os.path.join(path, name))
-            if duration is not None and duration > LONG_SECONDS:
+            if duration is not None and duration > settings.long_seconds():
                 planned.append((name, os.path.join('.trash', name)))
         return planned
     mapper = _abbreviate_mapper(path) if operation == 'abbreviate_dupes' else _mapper_for(path, operation)

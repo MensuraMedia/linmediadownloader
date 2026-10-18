@@ -17,7 +17,7 @@ from modules.config.settings import (
     download_queue,
     reset_cancel,
     is_cancel_requested,
-    LONG_SECONDS,
+    long_seconds,
 )
 
 logger = logging.getLogger('lmd.media')
@@ -415,7 +415,7 @@ def download_media(url, output_dir, download_type='audio', playlist_mode='single
         def _combined_filter(info_dict, *, incomplete=False):
             if skip_long:
                 dur = info_dict.get('duration')
-                if dur is not None and dur > LONG_SECONDS:
+                if dur is not None and dur > long_seconds():
                     set_track(info_dict, 'skipped_long')
                     return f"Skipping long file (>7 min): {info_dict.get('title', '')}"
             if ignore_dupes and dedupe.is_duplicate(info_dict):

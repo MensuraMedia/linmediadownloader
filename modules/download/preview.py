@@ -10,7 +10,7 @@ import re
 import yt_dlp
 
 from modules.config.logging_config import YTDLPLogger
-from modules.config.settings import LONG_SECONDS
+from modules.config import settings
 from modules.download import access, chapters, dedupe
 
 logger = logging.getLogger('lmd.preview')
@@ -72,7 +72,7 @@ def _entry(index, item, skip_long, ignore_dupes):
     item = item or {}
     duration = item.get('duration')
     skip = None
-    if skip_long and duration is not None and duration > LONG_SECONDS:
+    if skip_long and duration is not None and duration > settings.long_seconds():
         skip = 'long'
     elif ignore_dupes and dedupe.is_duplicate(item):
         skip = 'duplicate'

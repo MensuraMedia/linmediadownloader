@@ -37,12 +37,58 @@ SETTINGS_FILE = paths.data_file('app_settings.json')
 _settings = None   # lazy-loaded cache
 
 
+VIDEO_QUALITIES = ('1080', '720', '480')
+LONG_MINUTES_RANGE = (1, 60)
+_listeners = []
+
+
 def _defaults():
     return {
         'filler_words': sorted(DEFAULT_FILLER_WORDS),
         # each replacement: {"from": "x", "to": "y"} applied to file base names
         'char_replacements': [],
+        # 2.0 Settings page. '' download_folder = the default (~/Music/LinMediaDownloads)
+        'download_folder': '',
+        'download_type': 'audio',
+        'video_quality': '1080',
+        'long_minutes': 7,
+        # 'auto' (the signed-in browser in use), 'off', or a profile folder path
+        'browser_access': 'auto',
     }
+
+
+def _clean(key, value, current):
+    """A validated value for one setting, or the current one when the new one is invalid"""
+    if key == 'filler_words' and isinstance(value, list):
+        return sorted({str(w).strip().lower() for w in value if str(w).strip()})
+    if key == 'char_replacements' and isinstance(value, list):
+        clean = []
+        for r in value:
+            frm = str((r or {}).get('from', ''))
+            to = str((r or {}).get('to', ''))
+            if frm:
+                clean.append({'from': frm, 'to': to})
+        return clean
+    if key == 'download_folder' and isinstance(value, str):
+        return os.path.abspath(os.path.expanduser(value)) if value.strip() else ''
+    if key == 'download_type' and value in ('audio', 'video'):
+        return value
+    if key == 'video_quality' and str(value) in VIDEO_QUALITIES:
+        return str(value)
+    if key == 'long_minutes':
+        try:
+            low, high = LONG_MINUTES_RANGE
+            return max(low, min(high, int(value)))
+        except (TypeError, ValueError):
+            return current
+    if key == 'browser_access' and isinstance(value, str) and value.strip():
+        return value.strip()
+    return current
+
+
+def on_change(listener):
+    """listener(settings) after every save (the window follows the download folder)"""
+    _listeners.append(listener)
 
 
 def load_settings():
@@ -52,10 +98,9 @@ def load_settings():
         try:
             with open(SETTINGS_FILE) as f:
                 saved = json.load(f)
-            if isinstance(saved.get('filler_words'), list):
-                data['filler_words'] = saved['filler_words']
-            if isinstance(saved.get('char_replacements'), list):
-                data['char_replacements'] = saved['char_replacements']
+            for key in data:
+                if key in saved:
+                    data[key] = _clean(key, saved[key], data[key])
         except Exception as e:
             logger.error('Error loading app settings: %s', e)
     _settings = data
@@ -67,21 +112,15 @@ def get_settings():
 
 
 def save_settings(new_settings):
-    """Persist a full settings dict (validated/normalized)."""
+    """Persist the given settings (validated); keys left out keep their saved values.
+
+    (1.x rebuilt the whole file from defaults on every save, so saving the filler words
+    would have reset every other setting.)"""
     global _settings
-    data = _defaults()
-    fw = new_settings.get('filler_words')
-    if isinstance(fw, list):
-        data['filler_words'] = sorted({str(w).strip().lower() for w in fw if str(w).strip()})
-    cr = new_settings.get('char_replacements')
-    if isinstance(cr, list):
-        clean = []
-        for r in cr:
-            frm = str((r or {}).get('from', ''))
-            to = str((r or {}).get('to', ''))
-            if frm:
-                clean.append({'from': frm, 'to': to})
-        data['char_replacements'] = clean
+    data = dict(get_settings())
+    for key, value in (new_settings or {}).items():
+        if key in data:
+            data[key] = _clean(key, value, data[key])
     try:
         os.makedirs(os.path.dirname(SETTINGS_FILE), exist_ok=True)
         with open(SETTINGS_FILE, 'w') as f:
@@ -89,7 +128,19 @@ def save_settings(new_settings):
     except Exception as e:
         logger.error('Error saving app settings: %s', e)
     _settings = data
+    logger.info('Settings saved: %s', {k: v for k, v in data.items() if k not in ('filler_words',)})
+    for listener in list(_listeners):
+        try:
+            listener(_settings)
+        except Exception:
+            logger.exception('A settings listener failed')
     return _settings
+
+
+def reset_settings(keys=None):
+    """Back to the defaults (all settings, or only `keys`)"""
+    defaults = _defaults()
+    return save_settings({k: defaults[k] for k in (keys or defaults)})
 
 
 def get_filler_words():

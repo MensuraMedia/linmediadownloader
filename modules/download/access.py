@@ -320,14 +320,31 @@ _cache = {"at": 0.0, "access": None}
 _REFRESH_SECONDS = 300  # re-check every few minutes: the user may sign in or switch browsers
 
 
+def configured_choice():
+    """'auto', 'off' or a profile path: LMD_BROWSER_ACCESS=off wins, then Settings"""
+    if os.environ.get("LMD_BROWSER_ACCESS", "").lower() == "off":
+        return "off"
+    from modules.config import user_settings
+
+    return user_settings.get_settings().get("browser_access") or "auto"
+
+
 def current(refresh=False):
     """The Access to use now (cached for a few minutes)"""
     if not refresh and _cache["access"] is not None and time.time() - _cache["at"] < _REFRESH_SECONDS:
         return _cache["access"]
     profile = None
-    if os.environ.get("LMD_BROWSER_ACCESS", "").lower() != "off":
+    choice = configured_choice()
+    if choice != "off":
         try:
-            profile = choose_profile(discover_profiles())
+            profiles = discover_profiles()
+            if choice == "auto":
+                profile = choose_profile(profiles)
+            else:  # one profile picked in Settings: use it while it is still signed in
+                profile = next((p for p in profiles if p.path == choice and p.signed_in), None)
+                if profile is None:
+                    logger.warning("The chosen sign-in %s is gone or signed out; picking one by itself", choice)
+                    profile = choose_profile(profiles)
         except Exception:
             logger.exception("Browser discovery failed; continuing without a sign-in")
     access = Access(profile, find_js_runtime())
