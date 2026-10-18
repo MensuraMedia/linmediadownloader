@@ -18,3 +18,12 @@ def test_every_used_icon_exists_and_renders():
 
 def test_app_icons_ship_with_their_licence():
     assert 'LICENSE-phosphor' in os.listdir(app_icons.APP_ICON_DIR)
+
+
+def test_no_pill_carries_a_checkmark():
+    """The user asked for no checkmark in any pill (2026-10-18)"""
+    from ui.pages import activity
+    from ui.widgets import track_list
+
+    tables = list(track_list.ACTIVE_PILLS.values()) + list(activity.RESULT_PILLS.values())
+    assert not [row for row in tables if row[0] and row[0].startswith("check")]

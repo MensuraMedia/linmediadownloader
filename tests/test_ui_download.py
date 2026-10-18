@@ -176,7 +176,21 @@ def window_chip_text(page):
 
 def window_chip_word(page):
     """What the pill shows: the status word only"""
-    return page.window.chip.get_child().get_first_child().get_next_sibling().get_text()
+    labels = [c for c in _children(page.window.chip.get_child()) if isinstance(c, Gtk.Label)]
+    return labels[0].get_text()
+
+
+def _children(box):
+    child = box.get_first_child()
+    while child:
+        yield child
+        child = child.get_next_sibling()
+
+
+def test_ready_pill_has_no_checkmark(page):
+    """No checkmark in any pill: the green pill and "Ready" say it (user, 2026-10-18)"""
+    page.window.reset_chip()
+    assert not [c for c in _children(page.window.chip.get_child()) if not isinstance(c, Gtk.Label)]
 
 
 def test_read_a_playlist_to_ready(page, monkeypatch):

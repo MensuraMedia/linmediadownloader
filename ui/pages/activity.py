@@ -29,7 +29,7 @@ logger = logging.getLogger("lmd.ui.activity")
 
 C = tokens.COLOR
 RESULT_PILLS = {
-    "done": ("check-circle", messages.ACT_RESULT_DONE, "ok"),
+    "done": (None, messages.ACT_RESULT_DONE, "ok"),  # no checkmark in pills (user)
     "partial": (None, messages.ACT_RESULT_PARTIAL, "attention"),
     "cancelled": (None, messages.ACT_RESULT_CANCELLED, None),
     "failed": ("link-break", messages.ACT_RESULT_FAILED, "error"),

@@ -98,7 +98,8 @@ class AppStatusChip(kit.StatusChip):
             nxt = child.get_next_sibling()
             self._box.remove(child)
             child = nxt
-        self._box.append(kit.status_icon(key, 18))
+        if key != "ok":  # no checkmark in any pill: the green pill and its word say it (user)
+            self._box.append(kit.status_icon(key, 18))
         # The pill shows only the word that starts each sentence ("Ready", "Downloading");
         # the whole sentence stays as tooltip and accessible name.
         shown = text.split(" · ", 1)[0] or status.status(key).word
