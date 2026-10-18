@@ -11,6 +11,7 @@ from datetime import datetime
 
 from modules.config import settings
 from modules.config.settings import current_download, download_queue, request_cancel
+from modules.download import preview
 from modules.download.media import enqueue_download
 
 logger = logging.getLogger('lmd.jobs')
@@ -50,6 +51,7 @@ def submit_download(url, options=None):
     Returns {'status': 'started', 'job_id'} or {'status': 'queued', 'job_id',
     'position'} (position among jobs still waiting, 1-based).
     """
+    url = preview.strip_mix(url)  # a Mix is one video plus endless suggestions
     opts = normalize_options(options)
     # Title is filled in later, once the worker resolves it.
     settings.add_link_history(url, opts['download_type'], opts['playlist_mode'])

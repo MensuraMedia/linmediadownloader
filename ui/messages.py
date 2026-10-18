@@ -24,6 +24,11 @@ CHIP_TOOLS_NO_FFMPEG = "Needs you · ffmpeg is missing"
 CHIP_READING = "Busy · reading the link"
 CHIP_DOWNLOADING = "Busy · downloading {i} of {M}"
 CHIP_CANT_REACH = "Can't reach · {site}"
+# Which browser sign-in yt-dlp uses (modules/download/access.py picks it by itself)
+ACCESS_SIGNED_IN = "Signed in to YouTube through {browser}"
+ACCESS_NONE = (
+    "Not signed in: YouTube may ask to confirm you're not a bot. Signing in in any browser here fixes it."
+)
 # Finished with nothing saved (every track failed): never shown as a success
 DONE_NOTHING = "Nothing was downloaded"
 AB_NOTHING = "Nothing was downloaded · {time}"
@@ -187,9 +192,9 @@ ERRORS = {
     "bot_check": {
         "title": "YouTube didn't let this computer in",
         "body": (
-            "It asked to confirm you're not a bot. If you use a VPN, another server may help; "
-            "signing in through your web browser usually fixes this (coming soon); waiting 10 to "
-            "15 minutes sometimes does."
+            "It asked to confirm you're not a bot. Signing in to YouTube in a web browser on this "
+            "computer usually fixes this; the app finds and uses that sign-in by itself. If you use "
+            "a VPN, another server may help; waiting 10 to 15 minutes sometimes does."
         ),
     },
     "rate_limited": {

@@ -11,7 +11,7 @@ import yt_dlp
 
 from modules.config.logging_config import YTDLPLogger
 from modules.config.settings import LONG_SECONDS
-from modules.download import dedupe
+from modules.download import access, dedupe
 
 logger = logging.getLogger('lmd.preview')
 
@@ -42,9 +42,22 @@ def _extract(url):
         'extract_flat': 'in_playlist',
         'skip_download': True,
         'logger': YTDLPLogger(logging.getLogger('lmd.ytdlp.preview')),
+        **access.ydl_options(),  # the user's browser sign-in + a local JS runtime
     }
     with yt_dlp.YoutubeDL(opts) as ydl:
         return ydl.extract_info(url, download=False)
+
+
+def strip_mix(url):
+    """A YouTube Mix link (list=RD…) is an endless list YouTube makes up from one video:
+    read and download it as that one video, not as hundreds of suggestions."""
+    if not url or not re.search(r'[?&]list=RD', url):
+        return url
+    from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+
+    parts = urlsplit(url)
+    query = [(k, v) for k, v in parse_qsl(parts.query) if k not in ('list', 'start_radio', 'index', 'pp')]
+    return urlunsplit(parts._replace(query=urlencode(query)))
 
 
 def _playlist_url(url):
@@ -80,6 +93,7 @@ def preview_link(url, skip_long=False, ignore_dupes=False):
     'video_title' set, so the page can offer "This video" or the whole list.
     On failure 'error' is {'kind': classify_error(...), 'detail': yt-dlp's text}.
     """
+    url = strip_mix(url)
     result = {'url': url, 'kind': 'video', 'title': '', 'video_title': '', 'entries': [], 'error': None}
     try:
         info = _extract(url)

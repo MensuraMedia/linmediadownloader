@@ -11,6 +11,7 @@ import pytest
 
 os.environ['LMD_DATA_DIR'] = tempfile.mkdtemp(prefix='lmd-test-data-')
 os.environ['LMD_NO_MIGRATE'] = '1'
+os.environ['LMD_BROWSER_ACCESS'] = 'off'  # never read the user's real browser profiles
 
 # The vendored lintheme tests (tests/test_kit_*.py) import these two names.
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

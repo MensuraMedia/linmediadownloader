@@ -35,6 +35,23 @@
   queue_snapshot / clear_finished_jobs / normalize_options`; routes only translate HTTP.
 - Impact: modules/download/jobs.py (new), modules/routes/api.py.
 
+### 2026-10-18: YouTube access uses the user's own browser sign-in, found automatically
+- Reason: YouTube answers this machine's NordVPN exit IP with "Sign in to confirm you're not a
+  bot"; the 1.x android-client retry was refused too (seen in the first real 2.0 test). The
+  2026-10-14 Brave investigation (mint-optimization/brave-video-decode.md) showed a signed-in
+  profile gets through. The user asked for no manual step: detect browsers, see which is active,
+  check for cookies and route the app accordingly.
+- Decision: `modules/download/access.py` scans every Firefox-family (incl. LibreWolf, Flatpak/Snap)
+  and Chromium-family profile, reads only cookie names and timestamps (never values) to find a
+  current YouTube sign-in, prefers running browsers, then the most recent YouTube use, and gives
+  yt-dlp `cookiesfrombrowser` (LibreWolf via the firefox reader with a profile path) plus a local
+  JS runtime (`js_runtimes`; deno/node/bun/quickjs incl. nvm). The challenge solver comes from the
+  local `yt-dlp-ejs` package (`yt-dlp[default]`), never `--remote-components` at run time.
+  LMD_BROWSER_ACCESS=off disables it (a Settings switch comes in Phase 5); tests set it off.
+- Verified 2026-10-18 on this machine: LibreWolf chosen over Brave and Firefox; "Me at the zoo"
+  downloaded through the VPN as MP3 with status completed and no errors.
+- Impact: modules/download/{access,preview,media,jobs}.py, requirements.txt, ui (sign-in note).
+
 ### 2026-10-18: lintheme 1.5.0 vendored, with a GTK 4 port built here
 - Reason: The kit shipped GTK 3 components only; decision 3 of the 2.0 plan says build
   `lintheme/gtk4` here and offer it upstream.

@@ -110,3 +110,13 @@ def test_apply_options_rechecks_without_network(fake_extract):
 def test_480p_is_accepted():
     from modules.download import jobs
     assert jobs.normalize_options({'video_quality': '480'})['video_quality'] == '480'
+
+
+@pytest.mark.parametrize('url,expected', [
+    ('https://www.youtube.com/watch?v=oqvC0MLOMCU&list=RDoqvC0MLOMCU&start_radio=1',
+     'https://www.youtube.com/watch?v=oqvC0MLOMCU'),
+    ('https://www.youtube.com/watch?v=a1&list=PL123', 'https://www.youtube.com/watch?v=a1&list=PL123'),
+    ('https://www.youtube.com/playlist?list=PL123', 'https://www.youtube.com/playlist?list=PL123'),
+])
+def test_mix_links_become_the_single_video(url, expected):
+    assert preview.strip_mix(url) == expected

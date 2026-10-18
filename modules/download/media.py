@@ -9,6 +9,7 @@ import logging
 from datetime import datetime
 import yt_dlp
 from modules.utils.file_utils import sanitize_filename
+from modules.download import access
 from modules.config.logging_config import YTDLPLogger
 from modules.config.settings import (
     current_download,
@@ -28,6 +29,7 @@ def get_video_info(url):
         'extract_flat': True,
         'skip_download': True,
         'logger': YTDLPLogger(logging.getLogger('lmd.ytdlp.info')),
+        **access.ydl_options(),  # the user's browser sign-in + a local JS runtime
     }
     
     try:
@@ -327,7 +329,9 @@ def download_media(url, output_dir, download_type='audio', playlist_mode='single
                     except Exception as e:
                         logger.error('Error renaming file: %s', e)
             
-            return [info], None
+            # yt-dlp expects (files to delete, info); 1.x returned them swapped, so every
+            # download ended with "unhashable type: 'dict'" after the file was saved
+            return [], info
     
     # Setup common yt-dlp options
     ydl_opts = {
@@ -338,6 +342,7 @@ def download_media(url, output_dir, download_type='audio', playlist_mode='single
         'geo_bypass': True,
         'extractor_retries': 5,
         'logger': YTDLPLogger(logging.getLogger('lmd.ytdlp.dl'), on_error=record_error),
+        **access.ydl_options(),  # the user's browser sign-in + a local JS runtime
     }
 
     # Optional filters: skip long tracks (>7 min) and/or already-downloaded ones.

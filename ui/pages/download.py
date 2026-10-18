@@ -24,7 +24,7 @@ from gi.repository import Gdk, Gio, GLib, Gtk  # noqa: E402
 from lintheme import tokens  # noqa: E402
 from lintheme.gtk4 import components as kit  # noqa: E402
 from modules.config import settings  # noqa: E402
-from modules.download import jobs, preview  # noqa: E402
+from modules.download import access, jobs, preview  # noqa: E402
 from modules.utils import file_utils  # noqa: E402
 from ui import messages  # noqa: E402
 from ui.poller import ACTIVE_STATUSES, SnapshotPoller, snapshot_copy  # noqa: E402
@@ -292,6 +292,9 @@ class DownloadPage(Gtk.Box):
         self.link_card.add_row(kit.hbox(self.link_entry, paste))
         self.link_status = Gtk.Box(spacing=8)
         self.link_card.add_row(self.link_status)
+        self.access_note = kit.text("", "lt-caption", wrap=True)  # whose YouTube sign-in is used
+        self.access_note.set_visible(False)
+        self.link_card.add_row(self.access_note)
         box.append(self.link_card)
         # The narrow-mode strip sits right under the Link card, visible without scrolling
         box.append(self._build_strip_card())
@@ -1155,6 +1158,14 @@ class DownloadPage(Gtk.Box):
         copy = messages.ERRORS.get(kind) or messages.ERRORS["unknown"]
         return {"kind": kind, "title": copy["title"], "body": copy["body"]}
 
+    def _show_access_note(self):
+        """Say whose sign-in reached YouTube (cached by access.current(); no new browser scan)"""
+        browser = access.current().describe()["browser"]
+        self.access_note.set_text(
+            messages.ACCESS_SIGNED_IN.format(browser=browser) if browser else messages.ACCESS_NONE
+        )
+        self.access_note.set_visible(True)
+
     def _retry_download(self):
         """Run the same download again (after switching VPN server, for example)"""
         self._return_to_ready()
@@ -1302,6 +1313,7 @@ class DownloadPage(Gtk.Box):
                     spacing=6,
                 )
             )
+            self._show_access_note()
         elif self.state == "error":
             self._set_link_status(
                 kit.hbox(
