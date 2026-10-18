@@ -48,6 +48,8 @@ class DashboardWindow(Gtk.ApplicationWindow):
         self._mode = None
 
         header = css(Gtk.HeaderBar(), "lt-header")
+        # GTK 4 centres the window title unless told otherwise; the brand + crumb already name it
+        header.set_title_widget(Gtk.Box())
         brand = Gtk.Box(spacing=10)
         brand.append(icon(app_icon, 24, tokens.COLOR["accent"]))
         brand.append(text(app_name, "lt-brand"))

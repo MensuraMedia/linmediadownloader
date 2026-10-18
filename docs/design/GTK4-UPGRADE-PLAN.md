@@ -1,7 +1,7 @@
 # GTK 4 upgrade plan
 
 Status: **approved 2026-10-18**, in progress on `feat/2.0-gtk4` (1.x frozen as tag `v1.0.0`,
-fixes on `release/1.x`). Phases 0 and 1 done; see the table in section 6.
+fixes on `release/1.x`). Phases 0–2 done; see the table in section 6.
 
 This plan moves Linux Media Downloader from a Flask + PyWebView web UI to a native
 **Python 3 + GTK 4** app styled with the Lin* kit (`lintheme`, theme **Graphite Night**).
@@ -131,7 +131,7 @@ sends commands (enqueue, cancel) through the existing functions. Nothing blocks 
 |---|---|---|
 | 0 Prep **(done)** | Fixed app-data dir (`modules/config/paths.py`, copy-only 1.x migration); download/queue/cancel logic moved from `routes/api.py` to `modules/download/jobs.py`; tests isolated from real data | 92 tests pass; no cwd-relative paths |
 | 1 Kit **(done)** | `lintheme` 1.5.0 vendored (no gtk3) with the new `lintheme/gtk4` (all gtk3 components + shell, async `confirm`, maximize-safe layout modes), `icons.add_icon_dir`; 17 app icons in `resources/`, registered by `ui/icons.py` | 131 tests pass on a display (22 GTK tests skip cleanly without one); CSS parses in GTK 4 with zero errors |
-| 2 Shell + Download | Window, rail, chip, poller; Download page states 1–4 | Download → progress → done → error works end to end |
+| 2 Shell + Download **(done)** | `linmediadownloader.py`, `ui/` (app, window, poller, Download page in all states, ring, track list, messages), `modules/download/preview.py`, per-track states; `tools/shot_states.py` renders each state | 165 tests on a display; renders match the mockups; real window opens. Real downloads blocked here by YouTube's bot check (VPN exit IP) until browser sign-in lands |
 | 3 Activity | Queue + history + links merged; one history file with a migration | Old history and links appear |
 | 4 Library | Playlists, all files, tidy-names popover with preview, undo/redo, trash, player | Every 1.0 operation reachable |
 | 5 Settings | Defaults, tidy-name words, tools (version + update), privacy, about, FAQ | Settings persist; no "are you sure" on leave |

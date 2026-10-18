@@ -5,8 +5,8 @@ Copied, not referenced (universal instruction set: copy, don't reference), from
 
 | | |
 |---|---|
-| Kit version | 1.5.0 |
-| Source | linapptemplate `feat/gtk4-components` at `793f9d5` (built for this app on 2026-10-18; not merged upstream yet) |
+| Kit version | 1.5.1 |
+| Source | linapptemplate `feat/gtk4-components` at `0febc25` (built for this app on 2026-10-18; not merged upstream yet) |
 | Left out | `lintheme/gtk3/` (this app is GTK 4 only) |
 | App additions | none inside `lintheme/`; app-only icons live in `resources/icons/phosphor/regular/` and are registered with `icons.add_icon_dir()` |
 

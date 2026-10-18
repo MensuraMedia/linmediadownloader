@@ -40,3 +40,4 @@ dist/
 
 # Runtime logs
 logs/
+.glm-review/
