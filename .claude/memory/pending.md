@@ -3,7 +3,7 @@
 Opportunities identified during the 2026-07-31 review but intentionally **not** changed
 (to keep the optimization pass low-risk). Revisit when scope allows:
 
-- [ ] **cwd-relative paths** — `settings.py` builds `HISTORY_FILE`, `downloads/`, and
+- [x] **cwd-relative paths** (fixed 2026-10-18 on feat/2.0-gtk4: modules/config/paths.py) — `settings.py` builds `HISTORY_FILE`, `downloads/`, and
   `backups/` from `os.getcwd()`. Launching the app from a different directory splits state.
   Anchor these to a fixed app-data dir (e.g. `~/.local/share/linux-media-downloader`).
 - [ ] **AppDir duplication** — the packaging staging tree is a committed copy of the whole
@@ -24,3 +24,8 @@ Natural companion updates to design together: what to show for a download that F
 away, persisting the last result across an app restart, and clearing/curating the progress
 table on a new download. Treat as a small design pass before implementing. (Input box now
 auto-clears on successful completion; that part is done.)
+
+## 2026-10-18 — GTK 4 upgrade (approved; Phase 0 done, Phase 1 next)
+Plan + mockups: `docs/design/GTK4-UPGRADE-PLAN.md`, `docs/design/mockups-gtk4/`
+(canvas: https://claude.ai/artifact/Xv1GvXnzBciwh6UqgYwC7w). All 8 departures approved (decisions.md).
+Work on branch `feat/2.0-gtk4`. Next: Phase 1 — vendor lintheme, write lintheme/gtk4.

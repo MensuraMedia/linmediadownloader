@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 # modules/config/user_settings.py
 # User-editable settings that drive the text-control operations across the app
-# (filler words to remove, character replacements). Persisted to data/app_settings.json.
+# (filler words to remove, character replacements). Persisted to app_settings.json
+# in the app data directory (see modules/config/paths.py).
 
 import os
 import json
 import logging
+
+from modules.config import paths
 
 logger = logging.getLogger('lmd.user_settings')
 
@@ -29,7 +32,7 @@ DEFAULT_FILLER_WORDS = {
     'jan', 'feb', 'mar', 'apr', 'jun', 'jul', 'aug', 'sep', 'sept', 'oct', 'nov', 'dec',
 }
 
-SETTINGS_FILE = os.path.abspath(os.path.join('data', 'app_settings.json'))
+SETTINGS_FILE = paths.data_file('app_settings.json')
 
 _settings = None   # lazy-loaded cache
 

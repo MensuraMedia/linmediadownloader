@@ -38,14 +38,19 @@ to `yt-dlp`.
   (`current_download` dict, list singletons). These are **mutable and imported by
   reference**, so cross-module mutation works. Scalar flags (e.g. the cancel flag)
   MUST be accessed through the accessor functions, never imported by value.
-- Persistence: `data/download_history.json` (gitignored — personal data).
+- Persistence: one data folder, `~/.local/share/linmediadownloader` (`modules/config/paths.py`;
+  `LMD_DATA_DIR` overrides). Never write data relative to the cwd or the code folder.
+- Upgrade in progress: 2.0 native GTK 4 rewrite on `feat/2.0-gtk4` — docs/design/GTK4-UPGRADE-PLAN.md.
+  Download/queue commands for any front end: `modules/download/jobs.py`.
 
 ## Build & Runtime Standards (Enforced)
 ```
 # Build
 # (none — pure Python)
 
-# Test / syntax check (no unit suite yet)
+# Test (offline; tests/conftest.py isolates the data folder)
+venv/bin/python -m pytest -q
+# Import / syntax check
 python3 -c "import modules.config.settings, modules.download.media, modules.routes.api, modules.routes.ui; print('import OK')"
 python3 -m py_compile app.py browser_app.py modules/**/*.py
 

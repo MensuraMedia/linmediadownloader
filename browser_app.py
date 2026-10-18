@@ -2,7 +2,6 @@
 # browser_app.py
 # Fallback version of the app for browser access
 
-import os
 import logging
 from flask import Flask
 
@@ -14,7 +13,7 @@ logger = logging.getLogger('lmd.browser')
 # Import modules
 from modules.routes.ui import ui_routes
 from modules.routes.api import api_routes
-from modules.config.settings import SECRET_KEY
+from modules.config.settings import SECRET_KEY, default_download_path
 
 # Initialize Flask app
 app = Flask(__name__, static_folder='static', template_folder='templates')
@@ -29,10 +28,7 @@ if __name__ == '__main__':
     class BrowserFolderSelector:
         def openFileDialog(self, isFolder=False):
             """Simple function that returns the downloads folder path"""
-            # Create a downloads directory in the current folder
-            downloads_dir = os.path.abspath(os.path.join(os.getcwd(), 'downloads'))
-            os.makedirs(downloads_dir, exist_ok=True)
-            return downloads_dir
+            return default_download_path
 
     # Add this to the Flask app's globals for templates
     app.jinja_env.globals.update(

@@ -9,7 +9,7 @@ import json
 import difflib
 import logging
 
-from modules.config import user_settings
+from modules.config import paths, user_settings
 
 logger = logging.getLogger('lmd.dedupe')
 
@@ -20,7 +20,7 @@ STOPWORDS = {
 }
 
 SIMILARITY_THRESHOLD = 0.80          # ≥ this token/string similarity ⇒ duplicate
-MANIFEST_FILE = os.path.abspath(os.path.join('data', 'download_manifest.json'))
+MANIFEST_FILE = paths.data_file('download_manifest.json')
 MANIFEST_MAX = 5000
 
 _manifest = []   # [{'id':.., 'title':.., 'tokens':[...], 'timestamp':..}]

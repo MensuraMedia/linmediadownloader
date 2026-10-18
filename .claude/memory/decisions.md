@@ -1,5 +1,47 @@
 # Decisions
 
+### 2026-10-18: 2.0 is a native GTK 4 rewrite, in this repository
+- Reason: The Flask + PyWebView UI breaks the Lin* stack (web view, CDN-loaded Bootstrap,
+  10 pages) and caused the 2026-08-04 blank-window incident. A new repo would repeat the
+  two-repo drift fixed on 2026-08-05 and strand every install.sh / .deb user.
+- Decision: Rewrite the UI in Python + GTK 4.14 (no libadwaita) with vendored `lintheme`
+  (Graphite Night), following linapptemplate's GUI Guide and the universal instruction set.
+  Same repo: 1.x frozen as tag `v1.0.0` + branch `release/1.x`; work on `feat/2.0-gtk4`,
+  merged when the user is satisfied; released as 2.0.0. Approved by the user with all eight
+  recommendations in docs/design/GTK4-UPGRADE-PLAN.md section 5:
+  1. network only through yt-dlp to pasted links ("local only" = local dependencies; online
+     data sources are fine), 2. yt-dlp in the app venv, updated only on the user's click,
+  3. build `lintheme/gtk4` here and offer it upstream, 4. status chip = tools + site
+  reachability, 5. playlist badge colours limited to token colours, 6. drop browser mode and
+  the Flask API, 7. name "LinMediaDownloader", 8. version 2.0.0.
+- Impact: whole UI layer; packaging; docs. Plan + mockups in docs/design/.
+
+### 2026-10-18: All user data lives in one XDG data folder
+- Reason: 1.x resolved data/, logs/, downloads/, backups/ against the working directory, so
+  menu and terminal launches kept separate histories, `install.sh --uninstall` (rm -rf of the
+  install dir) deleted user data with the code, and the test suite wrote fake links into
+  whatever folder pytest ran from.
+- Decision: `modules/config/paths.py` owns every path: `~/.local/share/linmediadownloader`
+  (`$XDG_DATA_HOME`, `LMD_DATA_DIR` override). First start copies (never moves) the newest
+  1.x copy of each data file, skips corrupt JSON, never overwrites, writes a marker and runs
+  once. Old ./downloads folders stay scanned by the playlist code. Tests set LMD_DATA_DIR to a
+  temp dir in tests/conftest.py.
+- Impact: settings.py, user_settings.py, logging_config.py, dedupe.py, playlists.py, browser_app.py.
+
+### 2026-10-18: Download commands live in modules/download/jobs.py, not in Flask routes
+- Reason: `routes/api.py` held business logic (option validation, link history, queue
+  position, the cancel-and-record-partial step), which a GTK front end could not reuse.
+- Decision: `jobs.submit_download / cancel_active_download / status_snapshot /
+  queue_snapshot / clear_finished_jobs / normalize_options`; routes only translate HTTP.
+- Impact: modules/download/jobs.py (new), modules/routes/api.py.
+
+### 2026-10-18: AppDir/ is not hand-synced on the 2.0 branch
+- Reason: The 2026-07-31 sync rule exists only because AppDir/ is a committed copy; Phase 6
+  replaces it with a build-from-source step, and syncing a half-ported tree has no user.
+- Decision: On `feat/2.0-gtk4`, leave AppDir/ untouched until Phase 6 rebuilds it. The
+  2026-07-31 rule still applies to `release/1.x`.
+- Impact: AppDir/** (unchanged until Phase 6).
+
 ### 2026-08-05: MensuraMedia is the single canonical repository
 - Reason: The project existed as two divergent GitHub repos with unrelated histories —
   `mikesdatawork/linux-media-downloader` (had a logging framework + the launch fix) and

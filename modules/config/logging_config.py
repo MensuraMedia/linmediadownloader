@@ -2,7 +2,7 @@
 # modules/config/logging_config.py
 # Centralised logging configuration for Linux Media Downloader.
 #
-# Logs go to BOTH the console and a rotating file at <project>/logs/app.log so a
+# Logs go to BOTH the console and a rotating file at <data dir>/logs/app.log so a
 # download's full lifecycle (request -> yt-dlp activity -> result/errors) is
 # captured for review even after the window closes.
 
@@ -10,10 +10,9 @@ import os
 import logging
 from logging.handlers import RotatingFileHandler
 
-# Project root (mirrors settings.BASE_DIR but computed independently to avoid any
-# import-ordering coupling).
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-LOG_DIR = os.path.join(BASE_DIR, 'logs')
+from modules.config import paths
+
+LOG_DIR = paths.LOG_DIR
 LOG_FILE = os.path.join(LOG_DIR, 'app.log')
 
 _LOG_FORMAT = '%(asctime)s [%(levelname)-7s] %(name)s: %(message)s'

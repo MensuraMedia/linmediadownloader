@@ -7,14 +7,9 @@ import logging
 from flask import Blueprint, request, jsonify, send_file
 
 logger = logging.getLogger('lmd.api')
-from modules.config.settings import (
-    current_download,
-    default_download_path,
-    download_queue,
-    request_cancel,
-    add_link_history,
-)
-from modules.download.media import get_video_info, enqueue_download
+from modules.config.settings import default_download_path
+from modules.download.media import get_video_info
+from modules.download import jobs
 from modules.utils.file_utils import open_folder
 
 # Create blueprint
@@ -39,101 +34,36 @@ def get_default_path():
 
 @api_routes.route('/api/download', methods=['POST'])
 def start_download():
-    """Start the download process"""
-    data = request.get_json()
+    """Queue a download; it starts at once if nothing else is running."""
+    data = request.get_json(silent=True) or {}
     url = data.get('url', '')
-    output_dir = data.get('output_dir', default_download_path)
-    download_type = data.get('download_type', 'audio')
-    playlist_mode = data.get('playlist_mode', 'single')
-    # Video resolution cap; ignored for audio (always highest quality).
-    # Whitelist to the two supported values, defaulting to 1080p.
-    video_quality = str(data.get('video_quality', '1080'))
-    if video_quality not in ('720', '1080'):
-        video_quality = '1080'
-    skip_long = bool(data.get('skip_long', False))
-    split_chapters = bool(data.get('split_chapters', False))
-    ignore_dupes = bool(data.get('ignore_dupes', False))
-    try:
-        limit = int(data.get('limit', 0) or 0)
-    except (TypeError, ValueError):
-        limit = 0
-
     if not url:
         return jsonify({'error': 'No URL provided'})
-
-    # Record the submitted link in the links history (title filled in later
-    # once the download worker resolves it).
-    add_link_history(url, download_type, playlist_mode)
-
-    # Add to the queue. It starts immediately if idle, else runs after the
-    # current/earlier jobs finish (one at a time).
-    job = enqueue_download(url, output_dir, download_type, playlist_mode, skip_long, limit,
-                           split_chapters, ignore_dupes, video_quality=video_quality)
-
-    if job.get('status') == 'active':
-        return jsonify({'status': 'started', 'job_id': job['id']})
-    # Position among still-queued jobs
-    position = sum(1 for j in download_queue if j.get('status') == 'queued'
-                   and j['id'] <= job['id'])
-    return jsonify({'status': 'queued', 'job_id': job['id'], 'position': position})
+    return jsonify(jobs.submit_download(url, data))
 
 @api_routes.route('/api/cancel-download', methods=['POST'])
 def cancel_download():
     """Cancel the current download process"""
-    # Signal the running download thread to stop (single source of truth).
-    request_cancel()
-
-    # Update the current download status
-    current_download["status"] = "cancelled"
-    current_download["message"] = "Download cancelled by user"
-
-    # Record the partial download in history before returning.
-    # (Previously this block was dead code placed after the return statement.)
-    from modules.config.settings import download_history, save_download_history
-
-    # Only add to history if we have current download info
-    if current_download.get('playlist_title') or current_download.get('current_file'):
-        # Create a title from playlist or current file
-        title = current_download.get('playlist_title') or current_download.get('current_file', 'Unknown')
-        from datetime import datetime
-        download_history.append({
-            'url': '',  # URL might not be accessible here
-            'output_dir': current_download.get('output_path', ''),
-            'download_type': current_download.get('selected_mode', 'unknown'),
-            'is_playlist': current_download.get('is_playlist', False),
-            'title': title,
-            'status': 'completed_with_errors',  # This will show as 'Partial'
-            'timestamp': datetime.now().isoformat(timespec='seconds')
-        })
-        save_download_history()
-
+    jobs.cancel_active_download()
     return jsonify({"status": "cancelled"})
 
 
 @api_routes.route('/api/download-status')
 def download_status():
     """Get the current download status (+ how many jobs are still queued)."""
-    data = dict(current_download)
-    data['queue_pending'] = sum(1 for j in download_queue if j.get('status') == 'queued')
-    return jsonify(data)
+    return jsonify(jobs.status_snapshot())
 
 
 @api_routes.route('/api/queue')
 def queue_route():
     """Return the download queue (queued, active, and finished jobs) for Pending."""
-    return jsonify([
-        {k: j.get(k) for k in ('id', 'url', 'title', 'status', 'download_type',
-                               'playlist_mode', 'queued_at')}
-        for j in download_queue
-    ])
+    return jsonify(jobs.queue_snapshot())
 
 
 @api_routes.route('/api/clear-queue-finished', methods=['POST'])
 def clear_queue_finished_route():
     """Remove finished/errored/cancelled jobs from the queue list."""
-    download_queue[:] = [j for j in download_queue
-                         if j.get('status') in ('queued', 'active')]
-    return jsonify({'status': 'ok', 'remaining': len(download_queue)})
+    return jsonify({'status': 'ok', 'remaining': jobs.clear_finished_jobs()})
 
 @api_routes.route('/api/links-history')
 def links_history_route():

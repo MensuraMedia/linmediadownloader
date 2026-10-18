@@ -11,13 +11,13 @@ import logging
 import subprocess
 import unicodedata
 
-from modules.config import settings
+from modules.config import paths, settings
 from modules.utils.file_utils import sanitize_filename
 
 logger = logging.getLogger('lmd.playlists')
 
-# Per-playlist number colors (keyed by folder realpath), persisted to data/
-COLORS_FILE = os.path.abspath(os.path.join('data', 'playlist_colors.json'))
+# Per-playlist number colors (keyed by folder realpath), persisted in the data directory
+COLORS_FILE = paths.data_file('playlist_colors.json')
 DEFAULT_COLOR = '#0d6efd'
 
 
@@ -57,7 +57,7 @@ def set_playlist_color(path, color):
 # Fixed per-playlist sequence numbers. Each playlist keeps a monotonic "order"
 # assigned when it is first seen (newest gets the highest); the displayed badge
 # is order % 1000, so it counts 000..999 and wraps back to 000.
-SEQ_FILE = os.path.abspath(os.path.join('data', 'playlist_seq.json'))
+SEQ_FILE = paths.data_file('playlist_seq.json')
 
 
 def load_seq():
@@ -117,7 +117,8 @@ def _scan_dirs():
             dirs.add(os.path.dirname(out))
         else:
             dirs.add(out)
-    dirs.add(os.path.abspath('downloads'))
+    # 1.x kept downloads in ./downloads wherever it was launched; keep finding them.
+    dirs.update(paths.legacy_download_dirs())
     return {d for d in dirs if os.path.isdir(d)}
 
 

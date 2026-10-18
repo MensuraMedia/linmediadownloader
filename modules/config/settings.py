@@ -5,6 +5,8 @@
 import os
 import logging
 
+from modules.config import paths
+
 logger = logging.getLogger('lmd.settings')
 
 # App settings
@@ -32,15 +34,12 @@ def get_downloads_folder():
     if os.path.exists(home_downloads):
         return home_downloads
     
-    # Last resort, use the current directory's downloads folder
-    return os.path.join(os.getcwd(), 'downloads')
+    # Last resort: a downloads folder inside the app's data directory
+    os.makedirs(paths.FALLBACK_DOWNLOADS_DIR, exist_ok=True)
+    return paths.FALLBACK_DOWNLOADS_DIR
 
 # Default download path
 default_download_path = get_downloads_folder()
-
-# Create necessary directories
-os.makedirs('downloads', exist_ok=True)
-os.makedirs('backups', exist_ok=True)
 
 # Global state variables
 download_history = []
@@ -94,10 +93,7 @@ def is_cancel_requested():
 import json
 
 # Path to store download history
-HISTORY_FILE = os.path.join(os.getcwd(), 'data', 'download_history.json')
-
-# Ensure data directory exists
-os.makedirs(os.path.dirname(HISTORY_FILE), exist_ok=True)
+HISTORY_FILE = paths.data_file('download_history.json')
 
 # Function to save history (limited to 100 entries)
 def save_download_history():
@@ -135,14 +131,14 @@ load_download_history()
 from datetime import datetime
 
 links_history = []
-LINKS_HISTORY_FILE = os.path.join(os.getcwd(), 'data', 'links_history.json')
+LINKS_HISTORY_FILE = paths.data_file('links_history.json')
 
 
 def save_links_history():
     """Persist links history to JSON, keeping the 500 most recent entries."""
-    global links_history
+    # Mutate in place (never rebind) so other modules' imported references stay valid.
     if len(links_history) > 500:
-        links_history = links_history[-500:]
+        links_history[:] = links_history[-500:]
     try:
         with open(LINKS_HISTORY_FILE, 'w') as f:
             json.dump(links_history, f, indent=2)
@@ -151,17 +147,16 @@ def save_links_history():
 
 
 def load_links_history():
-    """Load links history from JSON file."""
-    global links_history
+    """Load links history from JSON file (in place, never rebind)."""
     if os.path.exists(LINKS_HISTORY_FILE):
         try:
             with open(LINKS_HISTORY_FILE, 'r') as f:
-                links_history = json.load(f)
+                links_history[:] = json.load(f)
         except Exception as e:
             logger.error('Error loading links history: %s', e)
-            links_history = []
+            links_history[:] = []
     else:
-        links_history = []
+        links_history[:] = []
 
 
 def add_link_history(url, download_type='audio', playlist_mode='single', title=None):
