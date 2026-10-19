@@ -1,5 +1,13 @@
 # Decisions
 
+### 2026-10-18: Pills carry no checkmark
+- Reason: The user found the check icon in Done/Ready pills redundant ("the green pill and text label
+  is enough") and asked for it gone from every pill.
+- Decision: Success pills (Done, Ready) show colour + word only. Busy, attention and error pills keep
+  their icon (spinner, clock, warning), so state is still not colour-only where it matters. Plain status
+  lines outside pills keep their icon.
+- Impact: ui/widgets/track_list.py, ui/pages/activity.py, ui/window.py; tests/test_ui_icons.py guards it.
+
 ### 2026-10-18: 2.0 is a native GTK 4 rewrite, in this repository
 - Reason: The Flask + PyWebView UI breaks the Lin* stack (web view, CDN-loaded Bootstrap,
   10 pages) and caused the 2026-08-04 blank-window incident. A new repo would repeat the
@@ -157,11 +165,3 @@
 - Decision: Sync changed runtime files into `AppDir/usr/bin/` on every runtime change until
   packaging is reworked to copy from source at build time (a future improvement).
 - Impact: `AppDir/usr/bin/**`.
-
-### 2026-10-18: Pills carry no checkmark
-- Reason: The user found the check icon in Done/Ready pills redundant ("the green pill and text label
-  is enough") and asked for it gone from every pill.
-- Decision: Success pills (Done, Ready) show colour + word only. Busy, attention and error pills keep
-  their icon (spinner, clock, warning), so state is still not colour-only where it matters. Plain status
-  lines outside pills keep their icon.
-- Impact: ui/widgets/track_list.py, ui/pages/activity.py, ui/window.py; tests/test_ui_icons.py guards it.
