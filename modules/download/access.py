@@ -18,8 +18,11 @@ import configparser
 import glob
 import logging
 import os
+import re
 import shutil
 import sqlite3
+import subprocess
+import sys
 import tempfile
 import time
 from dataclasses import dataclass
@@ -224,11 +227,37 @@ def choose_profile(profiles):
     return max(signed_in, key=lambda p: (p.running, p.last_used))
 
 
+# The app's own venv: the installers put Deno there (PyPI package "deno"), so a menu
+# launch finds it without PATH or a system package (Mint's nodejs is too old)
+VENV_BIN = os.path.dirname(sys.executable)
+NODE_MIN = (22, 0, 0)  # yt-dlp's minimum for node (utils/_jsruntime.py)
+
+
+def _node_version(path):
+    """(major, minor, patch) of a node binary, from --version or its nvm folder; None if unknown"""
+    try:
+        out = subprocess.run([path, "--version"], capture_output=True, text=True, timeout=5).stdout
+    except (OSError, subprocess.SubprocessError):
+        out = ""
+    found = re.search(r"v(\d+)\.(\d+)\.(\d+)", out) or re.search(r"/v(\d+)\.(\d+)\.(\d+)/", path)
+    return tuple(int(n) for n in found.groups()) if found else None
+
+
+def _supported(name, path):
+    if name != "node":
+        return True
+    version = _node_version(path)
+    if version is not None and version < NODE_MIN:
+        logger.info("Skipping %s: node %s is older than yt-dlp's minimum %s", path, version, NODE_MIN)
+        return False
+    return True
+
+
 def find_js_runtime(home=None):
     """{name: {'path': ...}} for the first local runtime yt-dlp supports, or None"""
     home = home or _home()
     candidates = {
-        "deno": [shutil.which("deno"), os.path.join(home, ".deno", "bin", "deno")],
+        "deno": [os.path.join(VENV_BIN, "deno"), shutil.which("deno"), os.path.join(home, ".deno", "bin", "deno")],
         "node": [shutil.which("node"), shutil.which("nodejs")]
         + sorted(glob.glob(os.path.join(home, ".nvm", "versions", "node", "*", "bin", "node")), reverse=True),
         "bun": [shutil.which("bun"), os.path.join(home, ".bun", "bin", "bun")],
@@ -236,7 +265,7 @@ def find_js_runtime(home=None):
     }
     for name, paths in candidates.items():
         for path in paths:
-            if path and os.path.isfile(path) and os.access(path, os.X_OK):
+            if path and os.path.isfile(path) and os.access(path, os.X_OK) and _supported(name, path):
                 return {name: {"path": path}}
     return None
 

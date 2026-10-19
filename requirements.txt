@@ -1,3 +1,5 @@
-Flask
+# LinMediaDownloader 2.0 — Python packages for the app's own venv.
+# GTK 4 and PyGObject come from the system (python3-gi, gir1.2-gtk-4.0): the venv is made
+# with --system-site-packages. The installers run `pip install -U -r requirements.txt`.
 yt-dlp[default]  # includes yt-dlp-ejs: the local solver for YouTube's JS challenges
-pywebview 
+deno>=2.3        # the JS runtime yt-dlp needs for YouTube, as a venv binary (apt's nodejs is too old)

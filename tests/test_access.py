@@ -111,6 +111,7 @@ def test_unreadable_database_is_skipped(tmp_path):
 
 def test_js_runtime_found_in_nvm(tmp_path, monkeypatch):
     monkeypatch.setattr(access.shutil, "which", lambda name: None)
+    monkeypatch.setattr(access, "VENV_BIN", str(tmp_path / "venv-bin"))
     node = tmp_path / ".nvm/versions/node/v24.0.0/bin/node"
     node.parent.mkdir(parents=True)
     node.write_text("#!/bin/sh\n")
@@ -207,3 +208,28 @@ def test_each_call_gets_its_own_copy_and_dead_sessions_are_cleaned(tmp_path, mon
     assert not dead.exists()  # leftovers of finished processes go
     access._remove_private_copy()  # this process exits: only its own folder is removed
     assert not os.path.exists(first) and base.exists()
+
+
+def _fake_runtime(path, version_line=""):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(f"#!/bin/sh\necho '{version_line}'\n")
+    path.chmod(0o755)
+    return path
+
+
+def test_the_venv_deno_comes_first(tmp_path, monkeypatch):
+    """The installers put Deno in the app's venv: a menu launch finds it without PATH"""
+    monkeypatch.setattr(access, "VENV_BIN", str(tmp_path / "venv" / "bin"))
+    deno = _fake_runtime(tmp_path / "venv" / "bin" / "deno")
+    node = _fake_runtime(tmp_path / "usr" / "node", "v24.1.0")
+    monkeypatch.setattr(access.shutil, "which", lambda name: str(node) if name == "node" else None)
+    assert access.find_js_runtime(home=str(tmp_path)) == {"deno": {"path": str(deno)}}
+
+
+def test_a_node_older_than_22_is_skipped(tmp_path, monkeypatch):
+    """Mint's apt nodejs is 18: yt-dlp refuses it, so look further (nvm)"""
+    monkeypatch.setattr(access, "VENV_BIN", str(tmp_path / "none"))
+    old = _fake_runtime(tmp_path / "usr" / "node", "v18.19.1")
+    monkeypatch.setattr(access.shutil, "which", lambda name: str(old) if name == "node" else None)
+    new = _fake_runtime(tmp_path / ".nvm/versions/node/v24.0.0/bin/node", "v24.0.0")
+    assert access.find_js_runtime(home=str(tmp_path)) == {"node": {"path": str(new)}}

@@ -1,9 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
-  <!-- App tile background (matches the app's #0d6efd accent) -->
-  <rect x="4" y="4" width="120" height="120" rx="26" fill="#0d6efd"/>
-  <!-- Heroicons "window" icon (heroicons.com), scaled 24->96 and centered -->
-  <g transform="translate(16,16) scale(4)" fill="none" stroke="#ffffff"
-     stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M3 8.25V18a2.25 2.25 0 0 0 2.25 2.25h13.5A2.25 2.25 0 0 0 21 18V8.25m-18 0V6a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 6v2.25m-18 0h18M5.25 6h.008v.008H5.25V6ZM7.5 6h.008v.008H7.5V6Zm2.25 0h.008v.008H9.75V6Z"/>
-  </g>
-</svg>

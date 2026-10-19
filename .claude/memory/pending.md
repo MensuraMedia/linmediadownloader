@@ -43,10 +43,15 @@ Work on branch `feat/2.0-gtk4`. Phases 0–5 done (kit 1.5.3). Next: Phase 6 —
   `libgtk-4-media-gstreamer` (Phase 4).
 
 ### Backlog after Phase 5 (2026-10-18, user: "most functionality is working; a few features still need work")
-- [ ] **Phase 6 — packaging**: build-deb.sh and install.sh for 2.0 (deps `python3-gi gir1.2-gtk-4.0
-  libgtk-4-media-gstreamer gstreamer1.0-plugins-good librsvg2-common fonts-ubuntu ffmpeg`); drop Flask,
-  PyWebView, WebKit2GTK, routes/, templates/, static/, app.py, browser_app.py; rebuild AppDir from source;
-  build-deb.sh still points at the 1.x Heroicons icon — use resources/icons/hicolor/…/org.mensuramedia.LinMediaDownloader.svg.
+- [x] **Phase 6 — installers** (2026-10-18): install.sh (2.0), clone-and-install.sh, build-deb.sh (2.0, app icon),
+  Deno from PyPI as the JS runtime; README leads with all three. Trialled in an isolated HOME (clone, update,
+  uninstall, in-place) and the .deb unpacked + its venv + app window. Not done: `sudo apt install` of the .deb
+  on a real system (needs the user's sudo), a fresh-VM install.
+- [ ] **Phase 6 — rest**: remove the 1.x web code (app.py, browser_app.py, modules/routes, templates, static,
+  Flask in requirements-dev, tests/test_app.py route tests); rebuild AppDir/AppImage from source or drop it;
+  rewrite the 1.x parts of INSTALL.md and docs/packaging.md.
+- [ ] **At the merge into main**: change `feat/2.0-gtk4` to `main` in install.sh, clone-and-install.sh (BRANCH
+  defaults), README and INSTALL.md (raw URLs, clone command); the old 1.x install.sh URL on main will then serve 2.0.
 - [ ] **Phase 7 — verify**: `xvfb-run -a pytest`, headless renders of every state, keyboard-only pass,
   Orca pass, design review against the guide's §14 checklist; then merge feat/2.0-gtk4 → main, tag v2.0.0.
 - [ ] Real-use check of Settings: Change… folder dialog, Check for update (needs network), Save diagnostics,

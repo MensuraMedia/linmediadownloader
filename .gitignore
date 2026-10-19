@@ -41,3 +41,4 @@ dist/
 # Runtime logs
 logs/
 .glm-review/
+.lmd-installer-clone

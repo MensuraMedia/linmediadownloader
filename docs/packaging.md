@@ -1,5 +1,8 @@
 # Packaging & Distribution Guide
 
+> **2.0 (GTK 4):** use `install.sh`, `clone-and-install.sh` or `packaging/build-deb.sh` — see the
+> [README](../README.md#-install). This guide describes **1.x** (Flask + PyWebView), kept on `release/1.x`.
+
 How to turn Linux Media Downloader into an installable desktop application for **Linux**
 and **Windows**. Grounded in the current repo (there is already a partial `AppDir/` AppImage
 scaffold and a `.desktop` file).

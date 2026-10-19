@@ -1,11 +1,43 @@
 # Installation & Setup
 
-How to install and run **Linux Media Downloader** as a desktop application on **Linux** and
+## LinMediaDownloader 2.0 (GTK 4) — Linux
+
+The quick ways (one command, `.deb`, clone and install) are at the top of the
+**[README](README.md#-install)**. This section is the manual route, for other distributions or
+when you want to see every step.
+
+**Needs:** Python 3.10+, GTK 4.10+ with PyGObject, ffmpeg. Optional: GStreamer for playback in
+the Library, the Ubuntu font.
+
+| Distribution | System packages |
+|---|---|
+| Debian / Ubuntu / Mint | `sudo apt install git python3-venv python3-gi python3-gi-cairo gir1.2-gtk-4.0 librsvg2-common ffmpeg libgtk-4-media-gstreamer gstreamer1.0-plugins-good fonts-ubuntu` |
+| Fedora | `sudo dnf install git python3-gobject gtk4 librsvg2 ffmpeg-free gstreamer1-plugins-good` |
+| Arch | `sudo pacman -S git python-gobject gtk4 librsvg ffmpeg gst-plugins-good` |
+
+(The Fedora and Arch lines are untested; the installers support Debian-based systems.)
+
+```bash
+git clone --branch feat/2.0-gtk4 https://github.com/MensuraMedia/linmediadownloader.git
+cd linmediadownloader
+python3 -m venv --system-site-packages venv     # GTK comes from the system's PyGObject
+venv/bin/pip install -U -r requirements.txt     # yt-dlp (+ its YouTube solver) and Deno
+venv/bin/python linmediadownloader.py           # start it
+./packaging/install-menu.sh                     # optional: program menu entry + icon
+```
+
+`-U` matters: the venv sees system packages, and an old distro yt-dlp would otherwise count as
+installed. Windows is not supported by 2.0 (GTK 4 app for Linux); use 1.x there.
+
+---
+
+## 1.x (Flask + web view)
+
+The rest of this file describes **1.x**, kept as tag `v1.0.0` and branch `release/1.x`.
+
+How to install and run **Linux Media Downloader** 1.x as a desktop application on **Linux** and
 **Windows**. For turning it into a distributable package (AppImage, .deb, Windows installer),
 see [docs/packaging.md](docs/packaging.md). For what's coming next, see [ROADMAP.md](ROADMAP.md).
-
-> **Still evolving:** this project is in active development and changes often. These steps
-> reflect the current build; check the repo for the latest.
 
 ---
 

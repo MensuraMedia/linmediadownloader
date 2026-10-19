@@ -29,6 +29,11 @@ session: GTK 4 upgrade, Phases 0–5 (handoff)
   and its tile must pin expand off). See changes/2026-10-18_polish-folder-pills-tiles.md.
 - Latest: 268 tests pass on a display; last code commit 5e4aa8e.
 
+## Installers (Phase 6, same day)
+- `install.sh` (one command via curl, or in place in a checkout), `clone-and-install.sh`, `packaging/build-deb.sh`;
+  README leads with all three. Branch in URLs/defaults is feat/2.0-gtk4 until the merge (pending.md).
+- Deno (PyPI) is the JS runtime in every venv; the dev venv has it too. 271 tests.
+
 ## What's next
 See pending.md "Backlog after Phase 5": Phase 6 packaging, Phase 7 verify, real-use checks of Settings,
 queue hand-over, playback deps, file-name style decision. Waiting on the user: upstream the kit branch to

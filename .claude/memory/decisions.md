@@ -1,5 +1,14 @@
 # Decisions
 
+### 2026-10-18: Installers ship Deno from PyPI as yt-dlp's JS runtime
+- Reason: YouTube downloads need a JS runtime for yt-dlp's challenge solver. yt-dlp needs node ≥ 22 or
+  deno ≥ 2.3; Mint 22's apt nodejs is 18 (refused), and this machine only worked through an nvm node.
+- Decision: requirements.txt adds `deno>=2.3` (the official PyPI wheel, a binary in venv/bin), so every
+  install method gets a supported runtime without apt or a curl|sh step. access.find_js_runtime checks the
+  venv first and skips node < 22. The app's code goes to ~/.local/opt/linmediadownloader (one command) or
+  /opt/linmediadownloader (.deb), never the data folder, so uninstalling can never delete user data.
+- Impact: requirements.txt, install.sh, clone-and-install.sh, packaging/build-deb.sh, modules/download/access.py.
+
 ### 2026-10-18: Pills carry no checkmark
 - Reason: The user found the check icon in Done/Ready pills redundant ("the green pill and text label
   is enough") and asked for it gone from every pill.

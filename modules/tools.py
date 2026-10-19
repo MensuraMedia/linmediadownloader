@@ -41,8 +41,11 @@ def ffmpeg_version():
 
 
 def can_update_ytdlp():
-    """yt-dlp lives in the app's own venv (not a system package): the app may update it"""
-    return sys.prefix != getattr(sys, 'base_prefix', sys.prefix)
+    """yt-dlp lives in the app's own venv (not a system package) and this user may write
+    there: the .deb's venv in /opt belongs to root, so it is updated with the package"""
+    if sys.prefix == getattr(sys, 'base_prefix', sys.prefix):
+        return False
+    return os.access(sys.prefix, os.W_OK)
 
 
 def update_ytdlp():
@@ -55,7 +58,7 @@ def update_ytdlp():
     before = ytdlp_version()
     if not can_update_ytdlp():
         return {'ok': False, 'before': before, 'after': before,
-                'output': 'yt-dlp comes from a system package here; update it with your package manager.'}
+                'output': 'yt-dlp here belongs to a system package or to all users; update it with your package manager.'}
     cmd = [sys.executable, '-m', 'pip', 'install', '--upgrade', '--disable-pip-version-check', 'yt-dlp[default]']
     logger.info('Updating yt-dlp: %s', ' '.join(cmd))
     try:

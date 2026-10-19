@@ -8,6 +8,7 @@
 
 ## Changes
 <!-- Add newest first -->
+- [2026-10-18 installers 2.0](changes/2026-10-18_installers-2.0.md) — install.sh, clone-and-install.sh, .deb for 2.0; Deno runtime; README install-first
 - [2026-10-18 polish: folder, pills, tiles](changes/2026-10-18_polish-folder-pills-tiles.md) — Open folder → playlist folder; no checkmarks in pills; centred Activity icons
 - [2026-10-18 Phases 3–5](changes/2026-10-18_phase3-5-activity-library-settings.md) — Activity, Library, Settings; per-process cookie copies; skips count as handled
 - [2026-08-02 deb package](changes/2026-08-02_deb-package.md) — .deb builder (packaging/build-deb.sh); /opt install, launcher, menu, postinst venv

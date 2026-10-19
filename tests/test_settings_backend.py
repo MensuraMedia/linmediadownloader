@@ -116,3 +116,12 @@ def test_ytdlp_update_is_refused_outside_a_venv(monkeypatch):
     monkeypatch.setattr(tools.sys, "base_prefix", tools.sys.prefix)
     result = tools.update_ytdlp()
     assert result["ok"] is False and "package manager" in result["output"]
+
+
+def test_ytdlp_update_is_refused_in_a_read_only_venv(monkeypatch):
+    """The .deb's venv in /opt belongs to root: the app must not offer to pip-install there"""
+    monkeypatch.setattr(tools.sys, "base_prefix", "/usr")
+    monkeypatch.setattr(tools.sys, "prefix", "/opt/linmediadownloader/venv")
+    monkeypatch.setattr(tools.os, "access", lambda path, mode: False)
+    assert tools.can_update_ytdlp() is False
+    assert "package manager" in tools.update_ytdlp()["output"]

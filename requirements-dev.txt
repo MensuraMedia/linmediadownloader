@@ -2,3 +2,5 @@
 -r requirements.txt
 pytest
 pyflakes
+black
+Flask  # only for the 1.x web routes still tested in tests/test_app.py, until they are removed

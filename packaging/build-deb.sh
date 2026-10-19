@@ -1,24 +1,29 @@
 #!/usr/bin/env bash
 #
-# build-deb.sh — build a .deb package for Linux Media Downloader.
+# build-deb.sh — build the LinMediaDownloader 2.0 .deb (GTK 4).
 #
 #   ./packaging/build-deb.sh
 #
-# Produces dist/linux-media-downloader_<version>_all.deb
+# Produces dist/linmediadownloader_<version>_all.deb (version from ./VERSION).
 #
-# The package installs the app under /opt/linux-media-downloader, adds a launcher
-# (/usr/bin/linux-media-downloader), a menu entry and icon. yt-dlp/Flask/pywebview
-# are installed into a venv by the postinst (they're not reliably in apt / change
-# often), reusing the system PyGObject/WebKit backend via --system-site-packages.
+# The package puts the app in /opt/linmediadownloader, a launcher in
+# /usr/bin/linmediadownloader, and the menu entry + icon under the app id
+# org.mensuramedia.LinMediaDownloader (so the panel and Alt+Tab show the icon).
+# GTK 4, PyGObject and ffmpeg come from apt (Depends). yt-dlp and Deno change too
+# often for apt, so postinst installs them into /opt/linmediadownloader/venv
+# (--system-site-packages, for the system's PyGObject); that step needs a network
+# connection. User data stays in ~/.local/share/linmediadownloader; downloads in
+# ~/Music/LinMediaDownloads. Removing the package removes neither.
 #
 set -euo pipefail
 
-PKG="linux-media-downloader"
-VERSION="1.0.0"
+PKG="linmediadownloader"
+APP_ID="org.mensuramedia.LinMediaDownloader"
 ARCH="all"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+VERSION="$(tr -d '[:space:]' < "$REPO_DIR/VERSION")"
 BUILD_DIR="$REPO_DIR/build/deb"
 ROOT="$BUILD_DIR/$PKG"
 APP_DIR="$ROOT/opt/$PKG"
@@ -26,104 +31,109 @@ DIST="$REPO_DIR/dist"
 
 echo "==> Cleaning build tree"
 rm -rf "$BUILD_DIR"
-mkdir -p "$APP_DIR" "$ROOT/DEBIAN" "$ROOT/usr/bin" \
-         "$ROOT/usr/share/applications" \
-         "$ROOT/usr/share/icons/hicolor/scalable/apps" "$DIST"
+mkdir -p "$APP_DIR" "$ROOT/DEBIAN" "$ROOT/usr/bin" "$ROOT/usr/share/applications" \
+         "$ROOT/usr/share/icons/hicolor/scalable/apps" "$ROOT/usr/share/doc/$PKG" "$DIST"
 
-echo "==> Copying application files"
-for item in app.py browser_app.py requirements.txt requirements-dev.txt LICENSE \
-            README.md DOCUMENTATION.md INSTALL.md ROADMAP.md modules templates static; do
-    [ -e "$REPO_DIR/$item" ] && cp -r "$REPO_DIR/$item" "$APP_DIR/"
+echo "==> Copying the 2.0 application (no 1.x web UI: routes, templates, static)"
+for item in linmediadownloader.py VERSION requirements.txt modules ui lintheme resources; do
+    cp -r "$REPO_DIR/$item" "$APP_DIR/"
 done
-# Strip caches
+rm -rf "$APP_DIR/modules/routes"
 find "$APP_DIR" -name '__pycache__' -type d -prune -exec rm -rf {} +
 find "$APP_DIR" -name '*.pyc' -delete
+find "$APP_DIR" -type d -exec chmod 755 {} +
+find "$APP_DIR" -type f -exec chmod 644 {} +
+cp "$REPO_DIR/LICENSE.md" "$ROOT/usr/share/doc/$PKG/copyright"
+cp "$REPO_DIR/README.md" "$ROOT/usr/share/doc/$PKG/README.md"
 
-echo "==> Installed size"
-INSTALLED_KB=$(du -sk "$APP_DIR" | cut -f1)
+INSTALLED_KB=$(du -sk "$ROOT" | cut -f1)
 
-echo "==> Writing DEBIAN/control"
+echo "==> DEBIAN/control"
 cat > "$ROOT/DEBIAN/control" <<EOF
 Package: $PKG
 Version: $VERSION
 Section: sound
 Priority: optional
 Architecture: $ARCH
-Depends: python3 (>= 3.8), python3-venv, python3-pip, ffmpeg, python3-gi, python3-gi-cairo, gir1.2-webkit2-4.1 | gir1.2-webkit2-4.0
+Depends: python3 (>= 3.10), python3-venv, python3-pip, python3-gi, python3-gi-cairo, gir1.2-gtk-4.0, librsvg2-common, ffmpeg
+Recommends: libgtk-4-media-gstreamer, gstreamer1.0-plugins-good, fonts-ubuntu
 Installed-Size: $INSTALLED_KB
 Maintainer: MensuraMedia <mensuramedia@gmail.com>
-Homepage: https://github.com/MensuraMedia/linux-media-downloader
-Description: Desktop YouTube media downloader (audio/video, playlists)
- A localhost desktop app to download and back up YouTube media for personal use.
- Audio (MP3) or video (MP4), single tracks or whole playlists, with a download
- queue, playlist/file managers, a built-in player, chapter splitting, and
- duplicate skipping. Runs in its own native window (PyWebView).
+Homepage: https://github.com/MensuraMedia/linmediadownloader
+Description: Download music, videos and playlists, and keep your library tidy
+ LinMediaDownloader is a native GTK 4 desktop app built on yt-dlp. Paste a link
+ to a video or playlist to save it as MP3 or MP4, split long videos into their
+ chapters, skip long files and ones you already have, then play, rename and
+ tidy the results in the Library. Uses your own browser's YouTube sign-in,
+ found automatically. No accounts, no telemetry.
+ .
+ Installing runs pip to put yt-dlp and Deno in the app's own environment, so it
+ needs a network connection.
 EOF
 
-echo "==> Writing launcher"
-cat > "$ROOT/usr/bin/$PKG" <<'EOF'
-#!/bin/bash
-# Launch Linux Media Downloader in its own window. Runs the code from /opt but
-# keeps user data (downloads, history) under the user's data directory.
-APP="/opt/linux-media-downloader"
-DATA="${XDG_DATA_HOME:-$HOME/.local/share}/linux-media-downloader"
-mkdir -p "$DATA"
-cd "$DATA"
-exec "$APP/venv/bin/python" "$APP/app.py" "$@"
+echo "==> Launcher"
+cat > "$ROOT/usr/bin/$PKG" <<EOF
+#!/bin/sh
+# Start LinMediaDownloader. Code in /opt; data in ~/.local/share/linmediadownloader.
+exec /opt/$PKG/venv/bin/python /opt/$PKG/linmediadownloader.py "\$@"
 EOF
 chmod 755 "$ROOT/usr/bin/$PKG"
 
 echo "==> Menu entry + icon"
-cp "$SCRIPT_DIR/$PKG.svg" "$ROOT/usr/share/icons/hicolor/scalable/apps/$PKG.svg"
-cat > "$ROOT/usr/share/applications/$PKG.desktop" <<EOF
+cp "$REPO_DIR/resources/icons/hicolor/scalable/apps/$APP_ID.svg" "$ROOT/usr/share/icons/hicolor/scalable/apps/"
+cat > "$ROOT/usr/share/applications/$APP_ID.desktop" <<EOF
 [Desktop Entry]
-Version=1.0
 Type=Application
-Name=Linux Media Downloader
-Comment=Download and back up YouTube media (audio/video, playlists)
+Name=LinMediaDownloader
+GenericName=Media Downloader
+Comment=Download videos, music and playlists, and keep your library tidy
 Exec=$PKG
-Icon=$PKG
+Icon=$APP_ID
 Terminal=false
-Categories=AudioVideo;Recorder;
-Keywords=youtube;download;media;music;video;backup;
-StartupWMClass=$PKG
+Categories=AudioVideo;Audio;Video;GTK;
+Keywords=youtube;download;media;music;video;playlist;mp3;
+StartupNotify=true
+StartupWMClass=$APP_ID
 EOF
+chmod 644 "$ROOT/usr/share/applications/$APP_ID.desktop" "$ROOT/usr/share/icons/hicolor/scalable/apps/$APP_ID.svg"
 
-echo "==> postinst (build venv, install Python deps)"
-cat > "$ROOT/DEBIAN/postinst" <<'EOF'
-#!/bin/bash
+echo "==> postinst: the app's Python environment"
+cat > "$ROOT/DEBIAN/postinst" <<EOF
+#!/bin/sh
 set -e
-APP="/opt/linux-media-downloader"
-echo "Setting up Python environment for Linux Media Downloader…"
-python3 -m venv --system-site-packages "$APP/venv"
-"$APP/venv/bin/pip" install --quiet --upgrade pip || true
-"$APP/venv/bin/pip" install --quiet -r "$APP/requirements.txt"
-# Refresh desktop database / icon cache (best effort)
-command -v update-desktop-database >/dev/null && update-desktop-database -q || true
-command -v gtk-update-icon-cache >/dev/null && gtk-update-icon-cache -f -t /usr/share/icons/hicolor 2>/dev/null || true
-echo "Linux Media Downloader installed. Launch it from your application menu."
+APP="/opt/$PKG"
+if [ "\$1" = "configure" ]; then
+    echo "Setting up LinMediaDownloader's Python environment (yt-dlp, Deno)…"
+    python3 -m venv --system-site-packages "\$APP/venv"
+    "\$APP/venv/bin/pip" install --quiet --disable-pip-version-check --upgrade pip || true
+    # -U: the venv sees system packages; a distro's old yt-dlp must not count as installed
+    if ! "\$APP/venv/bin/pip" install --quiet --disable-pip-version-check --upgrade -r "\$APP/requirements.txt"; then
+        echo "Could not download yt-dlp/Deno (no network?). Run: sudo dpkg-reconfigure $PKG" >&2
+        exit 1
+    fi
+    command -v update-desktop-database >/dev/null && update-desktop-database -q || true
+    command -v gtk-update-icon-cache >/dev/null && gtk-update-icon-cache -f -t /usr/share/icons/hicolor 2>/dev/null || true
+    echo "LinMediaDownloader is installed. Start it from your program menu."
+fi
 exit 0
 EOF
 chmod 755 "$ROOT/DEBIAN/postinst"
 
-echo "==> prerm (remove the venv created at install time)"
-cat > "$ROOT/DEBIAN/prerm" <<'EOF'
-#!/bin/bash
+echo "==> prerm: remove the environment postinst made"
+cat > "$ROOT/DEBIAN/prerm" <<EOF
+#!/bin/sh
 set -e
-rm -rf /opt/linux-media-downloader/venv || true
+rm -rf /opt/$PKG/venv
+find /opt/$PKG -name '__pycache__' -type d -prune -exec rm -rf {} + 2>/dev/null || true
 exit 0
 EOF
 chmod 755 "$ROOT/DEBIAN/prerm"
 
-echo "==> Building package"
+echo "==> Building"
 OUT="$DIST/${PKG}_${VERSION}_${ARCH}.deb"
-if command -v fakeroot >/dev/null; then
-    fakeroot dpkg-deb --build "$ROOT" "$OUT"
-else
-    dpkg-deb --build "$ROOT" "$OUT"
-fi
+dpkg-deb --root-owner-group --build "$ROOT" "$OUT" >/dev/null
 
 echo
 echo "✅ Built: $OUT"
-echo "   Install with:  sudo apt install $OUT"
-echo "   (or: sudo dpkg -i $OUT && sudo apt-get -f install)"
+echo "   Install:  sudo apt install ./$(realpath --relative-to="$PWD" "$OUT")"
+echo "   Remove:   sudo apt remove $PKG   (downloads and settings are kept)"
