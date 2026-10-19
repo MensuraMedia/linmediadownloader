@@ -8,6 +8,7 @@
 
 ## Changes
 <!-- Add newest first -->
+- [2026-10-18 polish: folder, pills, tiles](changes/2026-10-18_polish-folder-pills-tiles.md) — Open folder → playlist folder; no checkmarks in pills; centred Activity icons
 - [2026-10-18 Phases 3–5](changes/2026-10-18_phase3-5-activity-library-settings.md) — Activity, Library, Settings; per-process cookie copies; skips count as handled
 - [2026-08-02 deb package](changes/2026-08-02_deb-package.md) — .deb builder (packaging/build-deb.sh); /opt install, launcher, menu, postinst venv
 - [2026-08-02 settings page](changes/2026-08-02_settings-page.md) — User-editable filler words + char replacements; Apply-replacements op; FAQ text-ops

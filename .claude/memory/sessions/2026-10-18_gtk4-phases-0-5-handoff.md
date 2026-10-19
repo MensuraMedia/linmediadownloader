@@ -20,8 +20,14 @@ session: GTK 4 upgrade, Phases 0–5 (handoff)
 
 ## Key decisions (see decisions.md)
 - No browser mode, no Flask in 2.0; network only through yt-dlp to pasted links.
-- Status pill: one word (Ready / Downloading). Done = after the .webm is removed. Nothing saved = yellow dash ring.
+- Status pill: one word (Ready / Downloading); no checkmark in any pill (Done, Ready). Done = after the .webm is removed. Nothing saved = yellow dash ring.
 - Equal panes; columns Status · Name · Length · Size; no yellow borders; lists use the app's colours.
+
+## After the first handoff (same day)
+- Open folder opens the folder the files were saved in (a playlist's own folder); the done bar names it.
+- No checkmark in any pill; Activity tile icons centred (GTK 4 Box: an icon must expand to centre,
+  and its tile must pin expand off). See changes/2026-10-18_polish-folder-pills-tiles.md.
+- Latest: 268 tests pass on a display; last code commit 5e4aa8e.
 
 ## What's next
 See pending.md "Backlog after Phase 5": Phase 6 packaging, Phase 7 verify, real-use checks of Settings,
