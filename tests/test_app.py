@@ -574,15 +574,16 @@ def test_sequence_fixed_and_descending(pl_root):
     assert lst2[0]["name"] == "c_playlist"
 
 
-def test_sequence_wraps_at_1000(pl_root):
+def test_sequence_counts_to_99999_then_wraps(pl_root):
+    """The number counts up to 99999, then wraps (user, 2026-10-19; 1.x wrapped at 1000)"""
     import time
-    (pl_root / "seq.json").write_text('{"next": 999, "orders": {}}')
+    (pl_root / "seq.json").write_text('{"next": 99999, "orders": {}}')
     a = _make_playlist(pl_root, "a_playlist", ["x.mp3", "y.mp3"])
     _make_playlist(pl_root, "b_playlist", ["x.mp3", "y.mp3"])
-    os.utime(a, (time.time() - 100, time.time() - 100))  # a -> 999, b -> 1000
+    os.utime(a, (time.time() - 100, time.time() - 100))  # a -> 99999, b -> 100000
     seq = {p["name"]: p["seq"] for p in pl.list_playlists()}
-    assert seq["a_playlist"] == 999
-    assert seq["b_playlist"] == 0  # 1000 % 1000 wraps to 000
+    assert seq["a_playlist"] == 99999
+    assert seq["b_playlist"] == 0  # 100000 % 100000 wraps to 0
 
 
 def test_scan_does_not_walk_into_parent(tmp_path, monkeypatch):

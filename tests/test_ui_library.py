@@ -218,50 +218,77 @@ def test_search_narrows_the_sidebar(page):
     assert "Neo-Tokyo Ambience" in words and "AKIRA OST" not in words
 
 
-def test_rename_edits_inline_and_reports_errors(page, fake_library):
+def test_rename_files_opens_file_control_on_this_playlist(page, window):
+    """Renaming moved to File Control (user, 2026-10-19): the Library only links to it"""
     page.select(FAKE_PLAYLISTS[0])
-    page._start_rename()
-    assert page.rename_entry.get_visible() is True
-    page.rename_entry.set_text("Renamed OST")
-    page._apply_rename()
-    assert fake_library["rename"] == ("/music/akira", "Renamed OST")
-    assert page.title_label.get_text() == "Renamed OST"
+    page.rename_files_button.emit("clicked")
+    assert window.stack.get_visible_child_name() == "file_control"
+    assert window.file_control_page.target["path"] == "/music/akira"
+    assert not hasattr(page, "tidy_button") and not hasattr(page, "undo_button")
 
 
-def test_tidy_preview_and_apply(page, fake_library):
+def test_search_box_narrows_the_file_table(page):
     page.select(FAKE_PLAYLISTS[0])
-    tidy = page.tidy_button.get_popover().get_child()
-    tidy.select("remove_filler")
-    assert messages.LIB_PREVIEW.format(k=2, n=10) in label_texts(tidy)
-    assert "Illusion (Music Video).mp3" in label_texts(tidy)
-    assert "becomes" in label_texts(tidy)
-    assert tidy.apply_button.get_label() == messages.LIB_RENAME_K.format(k=2)
-    tidy.apply()
-    assert fake_library["apply"] == ("/music/akira", "remove_filler")
+    table = page.playlist_view
+    table.search.set_text("requiem")
+    assert [item.name for item in table.visible()] == ["Requiem.mp3"]
+    table.search.set_text("nothing like this")
+    assert table.visible() == [] and table.empty_note.get_visible()
+    table.search.set_text("")
+    assert len(table.visible()) == 3
 
 
-def test_tidy_delete_long_previews_a_trash_move(page, fake_library):
+def test_filters_show_same_size_and_long_files(page, monkeypatch):
     page.select(FAKE_PLAYLISTS[0])
-    tidy = page.tidy_button.get_popover().get_child()
-    tidy.select("delete_long")
-    assert tidy.apply_button.get_label() == messages.LIB_MOVE_K.format(k=1)
-    assert messages.LIB_OP_DELETE_LONG_NOTE in label_texts(tidy)
+    table = page.playlist_view
+    table.filter_choice.set_active_id("alike")
+    assert sorted(item.name for item in table.visible()) == ["Battle Against Clown.mp3", "Kaneda's Theme.mp3"]
+    table.filter_choice.set_active_id("video")
+    assert table.visible() == []
+    monkeypatch.setattr(table, "_long_minutes", lambda: 4)
+    table.filter_choice.set_active_id("long")
+    assert [item.name for item in table.visible()] == ["Requiem.mp3"]  # 262 s > 4 min
+    table.filter_choice.set_active_id("all")
+    assert len(table.visible()) == 3
 
 
-def test_tidy_all_files_runs_the_global_operation(page, fake_library):
-    page._on_view_changed("all")
-    tidy = page.all_tidy_button.get_popover().get_child()
-    tidy.select("upper_case")
-    assert tidy.apply_button.get_label() == messages.LIB_RENAME_K.format(k=1)
-    tidy.apply()
-    assert fake_library["global_op"] == "upper_case"
+def test_ticked_files_are_deleted_together_after_asking(page, fake_library, monkeypatch):
+    page.select(FAKE_PLAYLISTS[0])
+    table = page.playlist_view
+    assert not table.delete_button.get_sensitive()
+    trashed = []
+    monkeypatch.setattr(
+        library, "delete_media_file", lambda path: trashed.append(path) or {"status": "success"}
+    )
+    for item in table.visible()[:2]:
+        item.checked = True
+    table.paint_checked()
+    assert table.delete_button.get_sensitive()
+    assert table.count_label.get_text() == messages.LIB_CHECKED.format(k=2, n=3)
+    assert table.check_all.get_inconsistent()
+    asked = {}
+
+    def fake_confirm(_parent, title, body, confirm_label, **kwargs):
+        asked.update(title=title, detail=kwargs.get("detail_mono"), yes=kwargs.get("on_answer"))
+
+    import ui.pages.library as library_page_module
+
+    monkeypatch.setattr(library_page_module.kit, "confirm", fake_confirm)
+    table._confirm_delete()
+    assert asked["title"] == messages.LIB_DELETE_TITLE.format(k=2)
+    assert "Battle Against Clown.mp3" in asked["detail"]
+    assert trashed == []  # nothing moves before the answer
+    asked["yes"](True)
+    assert sorted(trashed) == ["/music/akira/Battle Against Clown.mp3", "/music/akira/Kaneda's Theme.mp3"]
 
 
-def test_undo_and_redo_say_why_they_are_off(page):
-    assert not page.undo_button.get_sensitive()
-    assert page.undo_button.get_tooltip_text() == messages.LIB_UNDO_NONE
-    assert not page.redo_button.get_sensitive()
-    assert page.redo_button.get_tooltip_text() == messages.LIB_REDO_NONE
+def test_select_all_ticks_only_what_the_filter_shows(page):
+    page.select(FAKE_PLAYLISTS[0])
+    table = page.playlist_view
+    table.search.set_text("requiem")
+    table.check_all.set_active(True)
+    table.search.set_text("")
+    assert [item.name for item in table.checked()] == ["Requiem.mp3"]
 
 
 def test_trash_confirm_lists_the_files_before_deleting(page, fake_library, monkeypatch, tmp_path):
@@ -416,9 +443,9 @@ def _fake_error(text):
 def test_tables_scroll_so_the_window_stays_800(page, window):
     """Both file tables live in ScrolledWindows: a 10-file playlist and the whole
     library keep the window's natural height within 800 px."""
-    assert isinstance(page.playlist_view.get_first_child(), Gtk.ScrolledWindow)
+    assert isinstance(page.playlist_view.view.get_parent(), Gtk.ScrolledWindow)
     page._on_view_changed("all")
-    assert isinstance(page.all_view.get_first_child(), Gtk.ScrolledWindow)
+    assert isinstance(page.all_view.view.get_parent(), Gtk.ScrolledWindow)
     minimum, natural = window.measure(Gtk.Orientation.VERTICAL, -1)[:2]
     assert natural <= 800, f"window wants {natural} px tall"
 
@@ -428,3 +455,15 @@ def test_play_button_is_a_48_px_square(page):
     assert request[1] == 48
     minimum, natural = page.bar.play_button.measure(Gtk.Orientation.HORIZONTAL, -1)[:2]
     assert natural <= 56, f"play button wants {natural} px wide"
+
+
+def test_playlist_number_is_plain_and_wraps_after_99999():
+    """No badge: the plain number, coloured, counting up to 99999 (user, 2026-10-19)"""
+    from ui.pages.library import badge_label
+
+    label = badge_label(12, "#5fd38d")
+    assert label.get_text() == "12"
+    assert "lt-badge" not in label.get_css_classes()
+    assert "lmd-seq-ok" in label.get_css_classes()
+    assert badge_label(99999, None).get_text() == "99999"
+    assert badge_label(100000, None).get_text() == "0"

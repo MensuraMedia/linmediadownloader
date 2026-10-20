@@ -87,14 +87,17 @@ code you are working on. Already have a clone? Run `./install.sh` inside it.
   adjustable); **Ignore duplicates** (tracks you already have, matched by id and by title).
 - **Split into tracks** — a long video with chapters (or a tracklist in its description) can be
   saved as one file per part.
-- **Queue** — paste the next link while one is running; it starts when the first finishes.
+- **Queue** — paste the next link while one is running, or several links at once; they download
+  one after another.
+- **Panel icon** — close the window while music downloads and the app keeps going from the panel.
 - **Activity** — what is downloading now, what is next, and the history of every link you
   pasted, with search, filters and *Try again*.
-- **Library** — your playlists with sequence badges, every file with length and size,
-  **Tidy names** (remove filler words, fix spacing and case, abbreviate) with a before/after
-  preview, **undo/redo**, trash, and a built-in player.
-- **Settings** — download folder, default format and quality, what "long" means, your filler
-  words, yt-dlp updates, the YouTube sign-in choice, and a diagnostics bundle for bug reports.
+- **Library** — your playlists with sequence numbers, every file with length and size, search,
+  filters, tick boxes to delete several files to the trash, and a built-in player.
+- **File Control** — rename a playlist or its files: **Tidy names** (remove filler words, fix
+  spacing and case, abbreviate) with a before/after preview and **undo/redo**.
+- **Settings** — download folder, default format and quality, what "long" means, yt-dlp updates,
+  the YouTube sign-in choice, and a diagnostics bundle for bug reports.
 - **Private** — no accounts, no telemetry, no AI. The only network traffic is yt-dlp fetching
   the links you paste.
 
@@ -119,7 +122,7 @@ Design mockups and the upgrade plan: **[docs/design/mockups-gtk4](docs/design/mo
 4. When it is done: **Open folder**, **Show file**, **Play in Library**, or paste the next link.
 
 Keyboard: Ctrl+L link field · Ctrl+V paste · Ctrl+Enter download · Esc cancel ·
-Alt+1…4 pages · in the Library: Space play/pause, ←/→ seek, ↑/↓ volume, Delete to trash.
+Alt+1…5 pages · in the Library: Space play/pause, ←/→ seek, ↑/↓ volume, Delete to trash.
 The full list is in **Settings → About → Keyboard shortcuts**.
 
 ---

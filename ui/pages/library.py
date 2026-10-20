@@ -22,6 +22,7 @@ from gi.repository import Gdk, Gio, GObject, Gtk  # noqa: E402
 from lintheme import tokens  # noqa: E402
 from lintheme.gtk4 import components as kit  # noqa: E402
 from modules import playlists as library
+from modules.config import user_settings  # noqa: E402
 from modules.utils import file_utils  # noqa: E402
 from ui import messages  # noqa: E402
 from ui.pages.download import fmt_size  # noqa: E402
@@ -32,6 +33,7 @@ logger = logging.getLogger("lmd.ui.library")
 
 C = tokens.COLOR
 SIDEBAR_W = 320
+SEQ_CHARS = 5  # a playlist number has up to five digits (1..99999)
 VIDEO_EXTS = {".mp4", ".mkv", ".webm", ".mov", ".avi", ".m4v"}
 
 # the six token colours a playlist badge may wear (ui/style.py has the classes)
@@ -52,45 +54,6 @@ COLOUR_NAMES = {
     "muted": messages.LIB_COLOUR_MUTED,
 }
 
-# the Tidy-names groups: (heading or None, [(label, operation), …])
-TIDY_GROUPS = (
-    (
-        messages.LIB_TIDY_CLEAN_UP,
-        (
-            (messages.LIB_OP_CLEAN, "clean"),
-            (messages.LIB_OP_REMOVE_FILLER, "remove_filler"),
-            (messages.LIB_OP_REMOVE_SPECIAL, "remove_special"),
-            (messages.LIB_OP_REPLACE_SPACES, "replace_spaces"),
-        ),
-    ),
-    (
-        messages.LIB_TIDY_SHORTEN,
-        (
-            (messages.LIB_OP_TRUNCATE, "truncate"),
-            (messages.LIB_OP_ABBREVIATE, "abbreviate_dupes"),
-            (messages.LIB_OP_STANDARD, "standard_font"),
-            (messages.LIB_OP_NUMBER, "number_prefix"),
-        ),
-    ),
-    (
-        messages.LIB_TIDY_CASE,
-        (
-            (messages.LIB_CASE_LOWER, "lower_case"),
-            (messages.LIB_CASE_UPPER, "upper_case"),
-            (messages.LIB_CASE_TITLE, "title_case"),
-            (messages.LIB_CASE_CAMEL, "camel_case"),
-        ),
-    ),
-    (
-        None,
-        (
-            (messages.LIB_OP_REPLACEMENTS, "apply_replacements"),
-            (messages.LIB_OP_DELETE_LONG, "delete_long"),
-        ),
-    ),
-)
-
-
 def badge_class(saved_hex):
     """The lmd-badge-* class for a saved colour; unknown colours become accent"""
     return TOKEN_COLOURS.get((saved_hex or "").lower(), "accent")
@@ -107,11 +70,14 @@ COLOUR_KEYS = {
 }
 
 
-def badge_label(order, saved_hex, size=26):
-    label = Gtk.Label(label=f"{order % 1000:03d}")
-    kit.css(label, "lt-badge", f"lmd-badge-{badge_class(saved_hex)}")
-    label.set_size_request(size, size)
-    label.set_halign(Gtk.Align.CENTER)
+def badge_label(order, saved_hex, large=False):
+    """A playlist's sequence number: the plain number in its colour, no badge (user,
+    2026-10-19). Counts 1..99999, then wraps like the 1.x 000..999 badges did."""
+    label = Gtk.Label(label=str(order % library.SEQ_WRAP))
+    kit.css(label, "lmd-seq", "lmd-seq-large" if large else None, f"lmd-seq-{badge_class(saved_hex)}")
+    if not large:  # in the sidebar the names line up whatever the number's length
+        label.set_width_chars(SEQ_CHARS)
+        label.set_xalign(1.0)
     label.set_valign(Gtk.Align.CENTER)
     return label
 
@@ -134,6 +100,7 @@ class FileItem(GObject.Object):
     size_text = GObject.Property(type=str, default="")
     folder = GObject.Property(type=str, default="")
     path = GObject.Property(type=str, default="")
+    checked = GObject.Property(type=bool, default=False)  # ticked for "Delete selected"
 
 
 def _text_cell(prop, heading=False, expand=False):
@@ -192,6 +159,35 @@ def _menu_cell(page):
     return factory
 
 
+def _check_cell(table):
+    """A tick box per row, bound both ways to the row's FileItem.checked"""
+    factory = Gtk.SignalListItemFactory()
+
+    def setup(_factory, item):
+        check = kit.css(Gtk.CheckButton(), "lmd-check")
+        check.set_halign(Gtk.Align.CENTER)
+        check._lmd_binding = None
+        check.connect("toggled", lambda *_a: table.paint_checked())
+        item.set_child(check)
+
+    def bind(_factory, item):
+        check, row = item.get_child(), item.get_item()
+        flags = GObject.BindingFlags.SYNC_CREATE | GObject.BindingFlags.BIDIRECTIONAL
+        check._lmd_binding = row.bind_property("checked", check, "active", flags)
+        kit.name(check, messages.LIB_CHECK_FILE.format(name=row.name))
+
+    def unbind(_factory, item):
+        check = item.get_child()
+        if check._lmd_binding is not None:
+            check._lmd_binding.unbind()
+            check._lmd_binding = None
+
+    factory.connect("setup", setup)
+    factory.connect("bind", bind)
+    factory.connect("unbind", unbind)
+    return factory
+
+
 def _column(title, prop, factory, text=False, sortable=True, expand=False):
     column = Gtk.ColumnViewColumn(title=title)
     column.set_factory(factory)
@@ -204,6 +200,191 @@ def _column(title, prop, factory, text=False, sortable=True, expand=False):
             sorter = Gtk.NumericSorter.new(Gtk.PropertyExpression.new(FileItem, None, prop))
         column.set_sorter(sorter)
     return column
+
+
+class FileTable(Gtk.Box):
+    """A file table with its own search, filter and tick boxes (user, 2026-10-19).
+
+    store (every file) -> FilterListModel (search + filter) -> SortListModel (the column
+    headers) -> SingleSelection -> ColumnView. Ticked rows are deleted together: they
+    move to their folder's trash, which the playlist's Trash pill empties for good."""
+
+    def __init__(self, page, store, with_folder):
+        super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        self.page = page
+        self.store = store
+        self.with_folder = with_folder
+        self.query = ""
+        self.kind = "all"
+        self._alike = set()
+        self._bulk = False
+
+        tools = Gtk.Box(spacing=8)
+        self.search = kit.entry(
+            placeholder=messages.LIB_SEARCH_FILES, accessible_name=messages.LIB_SEARCH_FILES, width_chars=10
+        )
+        self.search.set_hexpand(True)
+        self.search.connect("changed", self._on_search)
+        tools.append(self.search)
+        options = [
+            ("all", messages.LIB_FILTER_ALL),
+            ("audio", messages.LIB_FILTER_AUDIO),
+            ("video", messages.LIB_FILTER_VIDEO),
+            ("alike", messages.LIB_FILTER_ALIKE),
+        ]
+        if not with_folder:  # lengths are known for a playlist's files only
+            options.insert(3, ("long", messages.LIB_FILTER_LONG.format(n=self._long_minutes())))
+        self.filter_choice = kit.select(options, "all", self._on_kind, messages.LIB_FILTER_NAME)
+        tools.append(self.filter_choice)
+        self.append(tools)
+
+        picks = Gtk.Box(spacing=8)
+        self.check_all = kit.css(Gtk.CheckButton(label=messages.LIB_SELECT_ALL), "lmd-check")
+        self._check_all_handler = self.check_all.connect("toggled", self._on_check_all)
+        picks.append(self.check_all)
+        self.count_label = kit.text("", "lt-caption")
+        self.count_label.set_hexpand(True)
+        picks.append(self.count_label)
+        self.delete_button = kit.button(
+            messages.LIB_DELETE_NONE, kind="danger", icon_name="trash", on_click=self._confirm_delete
+        )
+        picks.append(self.delete_button)
+        self.append(picks)
+
+        self.filter = Gtk.CustomFilter.new(self._match)
+        self.filtered = Gtk.FilterListModel(model=store, filter=self.filter)
+        self.view = Gtk.ColumnView()
+        self.sorted = Gtk.SortListModel(model=self.filtered, sorter=self.view.get_sorter())
+        selection = Gtk.SingleSelection(model=self.sorted)
+        selection.set_autoselect(False)
+        self.view.set_model(selection)
+        self.view.set_hexpand(True)
+        self.view.set_vexpand(True)
+        self.view.set_enable_rubberband(False)
+        self.view.connect("activate", page._on_row_activated)
+        page._attach_table_keys(self.view)
+        check = _column("", "checked", _check_cell(self), sortable=False)
+        check.set_fixed_width(44)
+        self.view.append_column(check)
+        self.view.append_column(
+            _column(messages.LIB_COL_NAME, "name", _text_cell("name", expand=True), text=True, expand=True)
+        )
+        if not with_folder:
+            self.view.append_column(
+                _column(messages.LIB_COL_LENGTH, "seconds", _text_cell("length_text", heading=True))
+            )
+        self.view.append_column(_column(messages.LIB_COL_SIZE, "size", _text_cell("size_text", heading=True)))
+        if with_folder:
+            self.view.append_column(_column(messages.LIB_COL_FOLDER, "folder", _text_cell("folder")))
+        else:
+            menu = _column("", "path", _menu_cell(page), sortable=False)
+            menu.set_fixed_width(56)
+            self.view.append_column(menu)
+        # a ColumnView only scrolls inside a ScrolledWindow; bare, it reports the
+        # height of every row and grows the window past 800 px
+        scroll = Gtk.ScrolledWindow()
+        scroll.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+        scroll.set_child(self.view)
+        scroll.set_vexpand(True)
+        frame = kit.css(Gtk.Box(), "lt-card", "lmd-list")
+        frame.set_vexpand(True)
+        frame.append(scroll)
+        self.append(frame)
+        self.empty_note = kit.text(messages.LIB_FILTER_NONE, "lt-muted")
+        self.empty_note.set_visible(False)
+        self.append(self.empty_note)
+        self.set_vexpand(True)
+
+    # the ColumnView's model, for the page's row and keyboard handlers
+    def get_model(self):
+        return self.view.get_model()
+
+    def visible(self):
+        """The rows as shown: searched, filtered and sorted"""
+        return [self.sorted.get_item(i) for i in range(self.sorted.get_n_items())]
+
+    @staticmethod
+    def _long_minutes():
+        try:
+            return int(user_settings.get_settings().get("long_minutes") or 7)
+        except Exception:
+            return 7
+
+    # -- search and filter
+    def _match(self, item):
+        if self.query and self.query not in item.name.lower() and self.query not in item.folder.lower():
+            return False
+        ext = os.path.splitext(item.name)[1].lower()
+        if self.kind == "audio":
+            return ext not in VIDEO_EXTS
+        if self.kind == "video":
+            return ext in VIDEO_EXTS
+        if self.kind == "long":
+            return item.seconds > self._long_minutes() * 60
+        if self.kind == "alike":
+            return item.size > 0 and item.size in self._alike
+        return True
+
+    def _on_search(self, entry):
+        self.query = entry.get_text().strip().lower()
+        self.refilter()
+
+    def _on_kind(self, kind):
+        self.kind = kind or "all"
+        self.refilter()
+
+    def refilter(self):
+        """Call after the store is refilled or a search/filter changes"""
+        sizes = Counter(self.store.get_item(i).size for i in range(self.store.get_n_items()))
+        self._alike = {size for size, count in sizes.items() if count > 1}
+        self.filter.changed(Gtk.FilterChange.DIFFERENT)
+        self.empty_note.set_visible(self.store.get_n_items() > 0 and self.sorted.get_n_items() == 0)
+        self.paint_checked()
+
+    # -- ticks and delete
+    def checked(self):
+        """Ticked rows that the search and filter still show"""
+        return [item for item in self.visible() if item.checked]
+
+    def paint_checked(self):
+        if self._bulk:
+            return
+        ticked, shown = len(self.checked()), self.sorted.get_n_items()
+        self.count_label.set_text(messages.LIB_CHECKED.format(k=ticked, n=shown) if ticked else "")
+        self.delete_button.set_sensitive(ticked > 0)
+        label = messages.LIB_DELETE_K.format(k=ticked) if ticked else messages.LIB_DELETE_NONE
+        self.delete_button.get_child().get_last_child().set_text(label)
+        self.delete_button.set_tooltip_text("" if ticked else messages.LIB_DELETE_HOW)
+        self.check_all.handler_block(self._check_all_handler)
+        self.check_all.set_active(shown > 0 and ticked == shown)
+        self.check_all.set_inconsistent(0 < ticked < shown)
+        self.check_all.handler_unblock(self._check_all_handler)
+
+    def _on_check_all(self, button):
+        on = button.get_active()
+        self._bulk = True  # one count update, not one per row
+        try:
+            for item in self.visible():
+                item.checked = on
+        finally:
+            self._bulk = False
+        self.paint_checked()
+
+    def _confirm_delete(self):
+        items = self.checked()
+        if not items:
+            return
+        names = [item.name for item in items]
+        kit.confirm(
+            self.page.window,
+            messages.LIB_DELETE_TITLE.format(k=len(items)),
+            messages.LIB_DELETE_BODY,
+            messages.LIB_DELETE_GO.format(k=len(items)),
+            destructive=True,
+            cancel_label=messages.LIB_DELETE_KEEP,
+            detail_mono="\n".join(names),
+            on_answer=lambda yes: self.page.trash_files([item.path for item in items]) if yes else None,
+        )
 
 
 class LibraryPage(Gtk.Box):
@@ -278,10 +459,8 @@ class LibraryPage(Gtk.Box):
         # whole window's minimum width (1241 px for one long playlist name)
         self.title_label.set_ellipsize(3)
         self.title_label.set_hexpand(True)
-        self.rename_button = kit.icon_button("pencil-simple", "", on_click=lambda: self._start_rename())
         self.title_box = Gtk.Box(spacing=8)
         self.title_box.append(self.title_label)
-        self.title_box.append(self.rename_button)
         self.header.append(self.header_badge)
         self.header.append(self.title_box)
         filler = Gtk.Box()
@@ -289,24 +468,18 @@ class LibraryPage(Gtk.Box):
         self.header.append(filler)
         self.pills = Gtk.Box(spacing=8)
         self.header.append(self.pills)
-        self.rename_entry = kit.entry(accessible_name=messages.LIB_RENAME_APPLY, width_chars=20)
-        self.rename_entry.set_visible(False)
-        self.rename_entry.connect("activate", lambda *_a: self._apply_rename())
-        self.rename_error = kit.text("", "lt-error-text")
-        self.rename_error.set_visible(False)
         header_block = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
         header_block.append(self.header)
-        header_block.append(self.rename_entry)
-        header_block.append(self.rename_error)
         pane.append(header_block)
 
         toolbar = Gtk.Box(spacing=8)
-        self.tidy_button = self._build_tidy_button()
-        toolbar.append(self.tidy_button)
-        self.undo_button = kit.icon_button("arrow-counter-clockwise", messages.LIB_UNDO, on_click=self._undo)
-        self.redo_button = kit.icon_button("arrow-clockwise", messages.LIB_REDO, on_click=self._redo)
-        toolbar.append(self.undo_button)
-        toolbar.append(self.redo_button)
+        # renaming lives on the File Control page (user, 2026-10-19); this opens it here
+        self.rename_files_button = kit.button(
+            messages.LIB_RENAME_FILES,
+            on_click=lambda: self.selected and self.window.open_in_file_control(self.selected["path"]),
+            icon_name="files",
+        )
+        toolbar.append(self.rename_files_button)
         spacer = Gtk.Box()
         spacer.set_hexpand(True)
         toolbar.append(spacer)
@@ -330,47 +503,13 @@ class LibraryPage(Gtk.Box):
         self.stats_pills = Gtk.Box(spacing=8)
         head.append(self.stats_pills)
         pane.append(head)
-        toolbar = Gtk.Box(spacing=8)
-        self.all_tidy_button = self._build_tidy_button(all_files=True)
-        toolbar.append(self.all_tidy_button)
-        pane.append(toolbar)
         self.all_store = Gio.ListStore.new(FileItem)
         self.all_view = self._build_table(self.all_store, with_folder=True)
         pane.append(self.all_view)
         return pane
 
     def _build_table(self, store, with_folder):
-        selection = Gtk.SingleSelection(model=store)
-        selection.set_autoselect(False)
-        view = Gtk.ColumnView(model=selection)
-        view.set_hexpand(True)
-        view.set_vexpand(True)
-        view.set_enable_rubberband(False)
-        view.connect("activate", self._on_row_activated)
-        self._attach_table_keys(view)
-        view.append_column(
-            _column(messages.LIB_COL_NAME, "name", _text_cell("name", expand=True), text=True, expand=True)
-        )
-        view.append_column(
-            _column(messages.LIB_COL_LENGTH, "seconds", _text_cell("length_text", heading=True))
-        )
-        view.append_column(_column(messages.LIB_COL_SIZE, "size", _text_cell("size_text", heading=True)))
-        if with_folder:
-            view.append_column(_column(messages.LIB_COL_FOLDER, "folder", _text_cell("folder")))
-        else:
-            menu = _column("", "path", _menu_cell(self), sortable=False)
-            menu.set_fixed_width(56)
-            view.append_column(menu)
-        # a ColumnView only scrolls inside a ScrolledWindow; bare, it reports the
-        # height of every row and grows the window past 800 px
-        scroll = Gtk.ScrolledWindow()
-        scroll.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
-        scroll.set_child(view)
-        scroll.set_vexpand(True)
-        frame = kit.css(Gtk.Box(), "lt-card", "lmd-list")
-        frame.set_vexpand(True)
-        frame.append(scroll)
-        return frame
+        return FileTable(self, store, with_folder)
 
     def _attach_table_keys(self, view):
         keys = Gtk.EventControllerKey()
@@ -563,17 +702,11 @@ class LibraryPage(Gtk.Box):
             self.right_stack.set_visible_child_name("empty")
             return
         _clear_box(self.header_badge)
-        self.header_badge.append(badge_label(item.get("order", 0), item.get("color"), size=36))
+        self.header_badge.append(badge_label(item.get("order", 0), item.get("color"), large=True))
         self.title_label.set_text(item["name"])
         self.title_label.set_tooltip_text(item["name"])
-        self.title_box.set_visible(True)  # a rename left unfinished on another playlist
-        self.rename_button.set_tooltip_text(messages.LIB_RENAME.format(name=item["name"]))
-        kit.name(self.rename_button, messages.LIB_RENAME.format(name=item["name"]))
-        self.rename_entry.set_visible(False)
-        self.rename_error.set_visible(False)
         self._paint_pills()
         self._paint_table()
-        self._paint_stack_buttons()
 
     def _paint_pills(self):
         _clear_box(self.pills)
@@ -604,6 +737,7 @@ class LibraryPage(Gtk.Box):
         files = library.list_playlist_files(item["path"]) if item else None
         self.playlist_store.remove_all()
         if not files:
+            self.playlist_view.refilter()
             return
         # Name A to Z by default, as the mockup shows; the column headers re-sort
         for found in sorted(files, key=lambda f: f["filename"].lower()):
@@ -618,66 +752,30 @@ class LibraryPage(Gtk.Box):
                 path=os.path.join(item["path"], name),
             )
             self.playlist_store.append(entry)
-
-    def _paint_stack_buttons(self):
-        state = library.stack_state()
-        self.undo_button.set_sensitive(state.get("can_undo", False))
-        self.redo_button.set_sensitive(state.get("can_redo", False))
-        if not state.get("can_undo"):
-            self.undo_button.set_tooltip_text(messages.LIB_UNDO_NONE)
-        else:
-            self.undo_button.set_tooltip_text(messages.LIB_UNDO)
-        if not state.get("can_redo"):
-            self.redo_button.set_tooltip_text(messages.LIB_REDO_NONE)
-        else:
-            self.redo_button.set_tooltip_text(messages.LIB_REDO)
-
-    def _undo(self):
-        library.undo_last()
-        self._after_operation()
-
-    def _redo(self):
-        library.redo_last()
-        self._after_operation()
+        self.playlist_view.refilter()
 
     def _open_folder(self):
         if self.selected:
             file_utils.open_folder(self.selected["path"])
 
-    def _after_operation(self):
+    def files_changed(self, renamed=None):
+        """File Control renamed something: follow a renamed playlist, then repaint"""
+        if self.selected is not None:
+            path = self.selected["path"]
+            if renamed and path == renamed[0]:
+                path = renamed[1]
+            try:
+                items = library.list_playlists()
+            except Exception:
+                items = []
+            self.selected = next((p for p in items if p["path"] == path), None)
         self.refresh_sidebar()
-        self._paint_playlist()
-
-    # -- rename
-    def _start_rename(self):
-        if self.selected is None:
-            return
-        self.rename_entry.set_text(self.selected["name"])
-        self.rename_entry.set_visible(True)
-        self.rename_error.set_visible(False)
-        self.title_box.set_visible(False)
-        self.rename_entry.grab_focus()
-
-    def _apply_rename(self):
-        if self.selected is None:
-            return
-        name = self.rename_entry.get_text().strip()
-        if not name:
-            return
-        result = library.rename_playlist(self.selected["path"], name)
-        if result.get("status") == "success":
-            self.selected = dict(
-                self.selected,
-                name=result.get("name") or name,
-                path=result.get("path") or self.selected["path"],
-            )
-            self.rename_entry.set_visible(False)
-            self.title_box.set_visible(True)
-            self.refresh_sidebar()
-            self._paint_playlist()
+        if self.view_mode == "all":
+            self._paint_all_files()
+        elif self.selected is None:
+            self._select_first()
         else:
-            self.rename_error.set_text(result.get("message", ""))
-            self.rename_error.set_visible(True)
+            self._paint_playlist()
 
     # -- trash
     def _confirm_empty_trash(self):
@@ -742,9 +840,10 @@ class LibraryPage(Gtk.Box):
         self.player.play_list(entries, index)
 
     def _context(self):
+        """The rows to play through, in the order shown (searched, filtered, sorted)"""
         if self.view_mode == "all":
-            return self.all_store, ""
-        return self.playlist_store, (self.selected or {}).get("name", "")
+            return self.all_view.sorted, ""
+        return self.playlist_view.sorted, (self.selected or {}).get("name", "")
 
     def _entries_for(self, store, playlist_name, focus=None):
         entries = []
@@ -783,6 +882,23 @@ class LibraryPage(Gtk.Box):
             return
         if result.get("status") != "success":
             logger.warning("move to trash failed: %s", result.get("message"))
+        self._refresh_after_file_change()
+
+    def trash_files(self, paths):
+        """Move the ticked files to their folders' trash (recoverable until it is emptied)"""
+        self.player.stop()
+        failed = 0
+        for path in paths:
+            try:
+                result = library.delete_media_file(path)
+            except Exception:
+                logger.exception("moving %s to the trash failed", path)
+                failed += 1
+                continue
+            if result.get("status") != "success":
+                logger.warning("move to trash failed: %s", result.get("message"))
+                failed += 1
+        logger.info("moved %d of %d ticked files to the trash", len(paths) - failed, len(paths))
         self._refresh_after_file_change()
 
     def _refresh_after_file_change(self):
@@ -868,159 +984,4 @@ class LibraryPage(Gtk.Box):
                 path=found["path"],
             )
             self.all_store.append(entry)
-
-    # ================================================================ tidy names
-    def _build_tidy_button(self, all_files=False):
-        button = Gtk.MenuButton()
-        kit.css(button, "lt-btn")
-        button.set_child(
-            kit.hbox(
-                kit.icon("text-aa", 18),
-                Gtk.Label(label=messages.LIB_TIDY_NAMES),
-                kit.icon("caret-down", 14),
-                spacing=8,
-            )
-        )
-        popover = Gtk.Popover()
-        popover.set_child(TidyNames(self, all_files))
-        button.set_popover(popover)
-        return button
-
-    def apply_tidy(self, all_files, operation):
-        """The popover's primary button: the only place a tidy operation runs"""
-        try:
-            if all_files:
-                result = library.global_operation(operation)
-            else:
-                result = library.apply_operation(self.selected["path"], operation)
-        except Exception:
-            logger.exception("applying %s failed", operation)
-            return
-        logger.info("tidy %s: %s", operation, {k: v for k, v in result.items() if k != "moves"})
-        self._refresh_after_file_change()
-        self._paint_stack_buttons()
-
-    def tidy_target(self, all_files):
-        """The folder a preview runs over (None = every app folder)"""
-        if all_files:
-            return None
-        return self.selected["path"] if self.selected else None
-
-    def tidy_file_count(self, all_files):
-        if all_files:
-            try:
-                return len(library.list_all_media())
-            except Exception:
-                return 0
-        return (self.selected or {}).get("file_count") or 0
-
-
-class TidyNames(Gtk.Box):
-    """The Tidy-names popover content: groups, a live preview, one apply button.
-
-    Each popover owns its own state, so the playlist and the All-files toolbars
-    can both show one without sharing buttons."""
-
-    def __init__(self, page, all_files):
-        super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=10)
-        self.page = page
-        self.all_files = all_files
-        self.operation = None
-        self.planned = []
-        self.set_size_request(360, -1)
-        for edge in ("top", "bottom", "start", "end"):
-            getattr(self, f"set_margin_{edge}")(16)
-        head = Gtk.Box(spacing=8)
-        title = kit.text(messages.LIB_TIDY_NAMES, "lt-heading")
-        title.set_hexpand(True)
-        head.append(title)
-        # refreshed on every preview: the popover is built before a playlist is selected
-        self.count_note = kit.text(
-            messages.LIB_TIDY_ALL.format(n=page.tidy_file_count(all_files)), "lt-caption"
-        )
-        head.append(self.count_note)
-        self.append(head)
-        self.op_buttons = {}
-        for heading, operations in TIDY_GROUPS:
-            if heading:
-                self.append(kit.text(heading, "lt-caption"))
-            grid = Gtk.Grid(column_spacing=8, row_spacing=8)
-            for index, (label, operation) in enumerate(operations):
-                op_button = kit.button(label, on_click=lambda *_, op=operation: self.select(op))
-                op_button.set_hexpand(True)
-                grid.attach(op_button, index % 2, index // 2, 1, 1)
-                self.op_buttons[operation] = op_button
-            self.append(grid)
-        self.note = kit.text("", "lt-caption")
-        self.append(self.note)
-        self.preview_words = kit.text("", "lt-caption")
-        self.preview_old = kit.text("", "lt-mono")
-        self.preview_old.set_ellipsize(3)
-        self.preview_old.set_xalign(0.0)
-        self.preview_new = kit.text("", "lt-mono")
-        self.preview_new.set_ellipsize(3)
-        self.preview_new.set_xalign(0.0)
-        frame = kit.css(Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4), "lt-card")
-        frame.append(self.preview_words)
-        frame.append(self.preview_old)
-        self.preview_becomes = kit.text("", "lt-caption")  # the word, muted; the new name in mono
-        new_row = Gtk.Box(spacing=8)
-        new_row.append(self.preview_becomes)
-        new_row.append(self.preview_new)
-        frame.append(new_row)
-        self.append(frame)
-        buttons = Gtk.Box(spacing=8)
-        buttons.set_halign(Gtk.Align.END)
-        buttons.append(kit.button(messages.LIB_CLOSE, on_click=lambda: self.popdown()))
-        self.apply_button = kit.button("", kind="primary", on_click=self.apply)
-        self.apply_button.set_sensitive(False)
-        self.apply_button.set_tooltip_text(messages.LIB_PREVIEW_NONE)
-        buttons.append(self.apply_button)
-        self.append(buttons)
-
-    def popdown(self):
-        popover = self.get_ancestor(Gtk.Popover)
-        if popover is not None:
-            popover.popdown()
-
-    def select(self, operation):
-        self.operation = operation
-        for other, button in self.op_buttons.items():
-            (kit.css if other == operation else kit.uncss)(button, "lmd-selected")
-        is_delete = operation == "delete_long"
-        self.note.set_text(messages.LIB_OP_DELETE_LONG_NOTE if is_delete else "")
-        try:
-            if self.all_files:
-                planned = library.preview_global(operation)
-            else:
-                planned = library.preview_operation(self.page.tidy_target(False), operation)
-        except Exception:
-            logger.exception("previewing %s failed", operation)
-            planned = []
-        self.planned = planned
-        changed = len(planned)
-        total = self.page.tidy_file_count(self.all_files)
-        self.count_note.set_text(messages.LIB_TIDY_ALL.format(n=total))
-        if changed:
-            self.preview_words.set_text(messages.LIB_PREVIEW.format(k=changed, n=total))
-            old, new = planned[0]
-            self.preview_old.set_text(old)
-            self.preview_becomes.set_text(messages.LIB_PREVIEW_BECOMES)
-            self.preview_new.set_text(new)
-        else:
-            self.preview_words.set_text(messages.LIB_PREVIEW_NONE)
-            self.preview_old.set_text("")
-            self.preview_becomes.set_text("")
-            self.preview_new.set_text("")
-        label = (
-            messages.LIB_MOVE_K.format(k=changed) if is_delete else messages.LIB_RENAME_K.format(k=changed)
-        )
-        self.apply_button.set_label(label)
-        self.apply_button.set_sensitive(changed > 0)
-        self.apply_button.set_tooltip_text("" if changed else messages.LIB_PREVIEW_NONE)
-
-    def apply(self, *_args):
-        if not self.operation or not self.planned:
-            return
-        self.popdown()
-        self.page.apply_tidy(self.all_files, self.operation)
+        self.all_view.refilter()

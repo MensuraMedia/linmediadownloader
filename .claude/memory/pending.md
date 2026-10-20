@@ -28,7 +28,7 @@ auto-clears on successful completion; that part is done.)
 ## 2026-10-18 — GTK 4 upgrade (approved; Phases 0–5 done)
 Plan + mockups: `docs/design/GTK4-UPGRADE-PLAN.md`, `docs/design/mockups-gtk4/`
 (canvas: https://claude.ai/artifact/Xv1GvXnzBciwh6UqgYwC7w). All 8 departures approved (decisions.md).
-Work on branch `feat/2.0-gtk4`. Phases 0–5 done (kit 1.5.3). Next: Phase 6 — packaging. Handoff: sessions/2026-10-18_gtk4-phases-0-5-handoff.md
+Work on branch `feat/2.0-gtk4`. Phases 0–5 done (kit 1.5.3), Phase 6 installers done, user rounds 4–5 done. Next: user checks of rounds 4–5, rest of Phase 6 (1.x web code, AppImage). Handoff: sessions/2026-10-18_gtk4-phases-0-5-handoff.md
 - [ ] Offer linapptemplate branch `feat/gtk4-components` (local clone in a session scratchpad,
   commit 793f9d5) upstream — needs the user's OK; re-create from lintheme/ here if the clone is gone.
 - [ ] Kit gap: GtkDropDown arrow comes from the system theme (both toolkits), not a Phosphor caret.
@@ -63,5 +63,10 @@ Work on branch `feat/2.0-gtk4`. Phases 0–5 done (kit 1.5.3). Next: Phase 6 —
   1.x underscore sanitising.
 - [ ] Old 1.x "alternative method" retry in media.py: now only runs when entries are really missing; review
   whether it is still needed at all with cookies working.
+- [ ] tests/test_ui_activity.py reaches YouTube (preview of a fake PLact1 link via "Try again"): make it offline.
+- [ ] Real-use check of the panel icon: its look in the Cinnamon panel, Hide/Show, close-while-downloading, the
+  notification, GNOME without the AppIndicator extension (no icon: closing must quit).
+- [ ] Real-use check (2026-10-19 round): Open folder highlighting in Nemo; File Control apply/undo on real files;
+  Library tick-and-delete on real files; window drag down to single-column mode.
 - [ ] Cookie copies: per process under $XDG_RUNTIME_DIR/linmediadownloader/session-<pid>/ (fixed 2026-10-18 after
   test runs deleted a live download's copy); watch the log for "could not find firefox cookies database".

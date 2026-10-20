@@ -19,6 +19,7 @@ USED = (
     "clock-counter-clockwise",
     "music-notes",
     "gear-six",
+    "files",
     "dots-three",
     # status (lintheme.status)
     "check-circle",

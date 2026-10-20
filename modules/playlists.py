@@ -55,8 +55,9 @@ def set_playlist_color(path, color):
 
 
 # Fixed per-playlist sequence numbers. Each playlist keeps a monotonic "order"
-# assigned when it is first seen (newest gets the highest); the displayed badge
-# is order % 1000, so it counts 000..999 and wraps back to 000.
+# assigned when it is first seen (newest gets the highest); the displayed number
+# is order % SEQ_WRAP, so it counts up to 99999 and wraps back to 0.
+SEQ_WRAP = 100000
 SEQ_FILE = paths.data_file('playlist_seq.json')
 
 
@@ -222,7 +223,7 @@ def list_playlists():
 
     for rp, info in seen.items():
         info['order'] = orders.get(rp, 0)
-        info['seq'] = info['order'] % 1000  # 000..999, wraps
+        info['seq'] = info['order'] % SEQ_WRAP  # up to 99999, wraps
 
     # Latest-added (highest order) first.
     return sorted(seen.values(), key=lambda x: x['order'], reverse=True)

@@ -1,5 +1,42 @@
 # Decisions
 
+### 2026-10-19: Panel icon over raw StatusNotifierItem D-Bus; close hides only while busy
+- Reason: The user wants the app in the panel so it can be put away while music downloads. GTK 4 has no tray API;
+  XApp.StatusIcon and AyatanaAppIndicator are GTK 3 libraries and cannot load in a GTK 4 process.
+- Decision: ui/tray.py implements org.kde.StatusNotifierItem + com.canonical.dbusmenu with Gio (Cinnamon's
+  xapp-sn-watcher, KDE, GNOME + AppIndicator extension). The icon is always there while the app runs; clicking it
+  hides/shows the window. Closing the window hides it only while a download runs or waits (one notification says
+  so); idle, closing quits as before, and Quit (menu, Ctrl+Q) always quits. Without a panel nothing changes.
+- Impact: ui/tray.py, ui/app.py, ui/window.py.
+
+### 2026-10-19: Several links in one paste are queued at once
+- Reason: The user wants to paste different links for continuous downloading.
+- Decision: Two or more links in any link field are all submitted with the current choices (no preview); a playlist
+  page (…/playlist?list=) downloads whole, any other link as one video. One link is still read and previewed first.
+- Impact: modules/download/links.py, ui/pages/download.py.
+
+### 2026-10-19: Renaming lives on its own File Control page
+- Reason: The user asked for a "File Control" page holding all file-renaming capabilities, moved out of the Library.
+  The Tidy-names popover could only show one before/after pair; the word lists sat in Settings, away from the
+  operations that use them.
+- Decision: New rail page after Library: target (one playlist / all files), playlist rename, Tidy-names operations,
+  full preview list, Undo/Redo/Apply in a fixed action bar, filler words and replacements. The Library keeps playing,
+  trash, number colour, and gains search, a Show filter and tick-to-delete (to each playlist's trash, after a confirm
+  that lists the files); its "Rename files" opens File Control on that playlist. Nothing renames without Apply.
+- Impact: ui/pages/file_control.py, ui/pages/library.py, ui/pages/settings.py, ui/window.py.
+
+### 2026-10-19: The window never widens itself
+- Reason: The user: the app was "too wide and fixed" and widened "automatically as the data is downloaded".
+- Decision: Opens at 1040×720. Every label holding data (titles, paths, captions) ellipsizes or wraps; button rows
+  wrap; both halves of two-pane pages fit 960 px so the user can drag into single-column mode. Minimums are
+  measured, not guessed (wide 933 px, single-column 795 px on 2026-10-19).
+- Impact: see changes/2026-10-19_width-file-control-library-tools.md.
+
+### 2026-10-19: Playlist numbers are plain coloured numbers, 1–99999
+- Reason: User: remove the numbered badge, keep the number larger, limit the count to 99999.
+- Decision: The number in the playlist's colour (20 px, 30 px in the header), no badge; order % 100000.
+- Impact: ui/pages/library.py, modules/playlists.py (SEQ_WRAP), ui/style.py.
+
 ### 2026-10-18: Installers ship Deno from PyPI as yt-dlp's JS runtime
 - Reason: YouTube downloads need a JS runtime for yt-dlp's challenge solver. yt-dlp needs node ≥ 22 or
   deno ≥ 2.3; Mint 22's apt nodejs is 18 (refused), and this machine only worked through an nvm node.

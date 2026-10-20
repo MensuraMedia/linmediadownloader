@@ -26,11 +26,11 @@ from modules.download import access
 from modules.utils import file_utils
 from ui import messages
 from ui.pages.download import tilde
+from ui.widgets.button_flow import button_flow
 
 logger = logging.getLogger("lmd.ui.settings")
 
 C = tokens.COLOR
-FILLER_SHOWN = 12
 
 
 def _clear_box(box):
@@ -61,7 +61,6 @@ class SettingsPage(Gtk.Box):
         self.window = window
         self._tools_read = False
         self._updating = False
-        self._words_open = False
         self._build()
         self._load_values()
         window.on_layout(self._on_layout)
@@ -81,8 +80,7 @@ class SettingsPage(Gtk.Box):
         self.col_left = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
         self.col_right = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
         self.col_left.append(self._build_downloads_card())
-        self.col_left.append(self._build_tidy_card())
-        self.col_right.append(self._build_tools_card())
+        self.col_left.append(self._build_tools_card())
         self.col_right.append(self._build_signin_card())
         self.col_right.append(self._build_privacy_card())
         self.col_right.append(self._build_about_card())
@@ -106,6 +104,8 @@ class SettingsPage(Gtk.Box):
     def _build_downloads_card(self):
         card = kit.Card(messages.SET_CARD_DOWNLOADS)
         self.folder_label = kit.text("")
+        self.folder_label.set_ellipsize(1)  # start: a deep folder keeps its own name in view
+        self.folder_label.set_hexpand(True)
         folder_box = kit.css(
             kit.hbox(kit.icon("folder-simple", 18, C["text_muted"]), self.folder_label, spacing=8),
             "lt-entry",
@@ -115,10 +115,10 @@ class SettingsPage(Gtk.Box):
         self.use_default = kit.button(messages.SET_USE_DEFAULT, kind="link", on_click=self._use_default)
         change = kit.button(messages.SET_CHANGE, on_click=self._change_folder)
         card.add_row(kit.hbox(folder_box, self.use_default, change))
-        self.folder_error = kit.text("", "lt-error-text")
+        self.folder_error = kit.text("", "lt-error-text", wrap=True)
         self.folder_error.set_visible(False)  # shown only with a message (no empty gap)
         card.add_row(self.folder_error)
-        self.folder_note = kit.text("", "lt-caption")
+        self.folder_note = kit.text("", "lt-caption", wrap=True)
         card.add_row(self.folder_note)
 
         self.format_seg = kit.Segmented(
@@ -147,7 +147,7 @@ class SettingsPage(Gtk.Box):
             kit.hbox(
                 kit.text(messages.SET_LONG_MEANS, "lt-field-label"),
                 self.minutes,
-                kit.text(messages.SET_LONG_NOTE, "lt-caption"),
+                kit.text(messages.SET_LONG_NOTE, "lt-caption", wrap=True),
                 spacing=12,
             )
         )
@@ -159,8 +159,6 @@ class SettingsPage(Gtk.Box):
         self.format_seg.set_value(values.get("download_type") or "audio")
         self.quality_seg.set_value(str(values.get("video_quality") or "1080"))
         self.minutes.set_value(int(values.get("long_minutes") or 7))
-        self._paint_words()
-        self._paint_replacements()
         self._paint_signin_choice()
 
     # -- folder
@@ -218,176 +216,6 @@ class SettingsPage(Gtk.Box):
         user_settings.save_settings({"long_minutes": value})
 
     # ================================================================ Tidy names
-    def _build_tidy_card(self):
-        card = kit.Card(
-            messages.SET_CARD_TIDY,
-            action=(messages.SET_RESET_DEFAULTS, self._confirm_reset),
-        )
-        card.add_row(kit.text(messages.SET_FILLER_NOTE, "lt-muted"))
-        self.words_box = Gtk.FlowBox()
-        self.words_box.set_selection_mode(Gtk.SelectionMode.NONE)
-        self.words_box.set_homogeneous(False)  # each tag as wide as its word, not a column
-        self.words_box.set_max_children_per_line(30)
-        self.words_box.set_min_children_per_line(1)
-        self.words_box.set_column_spacing(6)
-        self.words_box.set_row_spacing(6)
-        card.add_row(self.words_box)
-        self.more_words = kit.button("", kind="link", on_click=self._toggle_words)
-        card.add_row(self.more_words)
-        self.word_entry = kit.entry(
-            placeholder=messages.SET_ADD_WORD, accessible_name=messages.SET_ADD_WORD, width_chars=18
-        )
-        self.word_entry.set_hexpand(True)
-        self.word_entry.connect("activate", lambda *_a: self._add_word())
-        add = kit.button(messages.SET_ADD, on_click=lambda *_a: self._add_word())
-        self.word_note = kit.text("", "lt-caption")
-        card.add_row(kit.hbox(self.word_entry, add))
-        card.add_row(self.word_note)
-
-        card.add_row(kit.text(messages.SET_REPLACEMENTS, "lt-muted"))
-        self.replacements_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
-        card.add_row(self.replacements_box)
-        return card
-
-    def _paint_words(self):
-        words = list(user_settings.get_settings().get("filler_words") or [])
-        _clear_box(self.words_box)
-        shown = words if self._words_open else words[:FILLER_SHOWN]
-        for word in shown:
-            self.words_box.append(self._word_tag(word))
-        child = self.words_box.get_first_child()
-        while child:  # the tags' remove buttons take focus, not their cells
-            child.set_can_focus(False)
-            child.set_halign(Gtk.Align.START)
-            child = child.get_next_sibling()
-        hidden = len(words) - len(shown)
-        if hidden or self._words_open and len(words) > FILLER_SHOWN:
-            self.more_words.set_label(
-                messages.SET_MORE_WORDS.format(n=hidden) if hidden else messages.SET_FEWER_WORDS
-            )
-            self.more_words.set_visible(True)
-        else:
-            self.more_words.set_visible(False)
-
-    def _word_tag(self, word):
-        tag = kit.css(Gtk.Box(spacing=4), "lt-pill", "lmd-tag")
-        tag.append(Gtk.Label(label=word))
-        spoken = messages.SET_REMOVE_WORD.format(word=word)
-        remove = kit.icon_button("x", spoken, on_click=lambda *_, w=word: self._remove_word(w))
-        kit.css(remove, "lmd-tag-x")  # a 32 px target (the guide's floor) keeps the pill compact
-        remove.set_child(kit.icon("x", 14))
-        remove.set_valign(Gtk.Align.CENTER)
-        tag.set_valign(Gtk.Align.CENTER)
-        tag.append(remove)
-        return tag
-
-    def _toggle_words(self, *_args):
-        self._words_open = not self._words_open
-        self._paint_words()
-
-    def _add_word(self, *_args):
-        word = self.word_entry.get_text().strip().lower()
-        if not word:
-            return
-        words = list(user_settings.get_settings().get("filler_words") or [])
-        if word in words:
-            self.word_note.set_text(messages.SET_WORD_EXISTS)
-            return
-        user_settings.save_settings({"filler_words": words + [word]})
-        self.word_entry.set_text("")
-        self.word_note.set_text(messages.SET_WORD_ADDED)
-        self._paint_words()
-
-    def _remove_word(self, word):
-        words = [w for w in (user_settings.get_settings().get("filler_words") or []) if w != word]
-        user_settings.save_settings({"filler_words": words})
-        self._paint_words()
-
-    def _confirm_reset(self, *_args):
-        kit.confirm(
-            self.window,
-            messages.SET_RESET_TITLE,
-            messages.SET_RESET_BODY,
-            messages.SET_RESET_GO,
-            destructive=True,
-            cancel_label=messages.SET_RESET_KEEP,
-            on_answer=lambda yes: self._reset_tidy() if yes else None,
-        )
-
-    def _reset_tidy(self):
-        user_settings.reset_settings(["filler_words", "char_replacements"])
-        self._words_open = False
-        self._paint_words()
-        self._paint_replacements()
-
-    # -- replacements
-    def _paint_replacements(self):
-        _clear_box(self.replacements_box)
-        rows = list(user_settings.get_settings().get("char_replacements") or [])
-        for index, row in enumerate(rows):
-            self.replacements_box.append(self._replacement_row(index, row))
-        self.replacements_box.append(self._add_replacement_row())
-
-    def _replacement_row(self, index, row):
-        box = Gtk.Box(spacing=8)
-        frm = kit.entry(value=row.get("from", ""), accessible_name=messages.SET_FROM, width_chars=10)
-        frm.connect("activate", lambda *_a, e=frm, i=index: self._save_replacement(i, "from", e))
-        to = kit.entry(value=row.get("to", ""), accessible_name=messages.SET_TO, width_chars=10)
-        to.connect("activate", lambda *_a, e=to, i=index: self._save_replacement(i, "to", e))
-        remove = kit.icon_button(
-            "x", messages.SET_REMOVE_REPLACEMENT, on_click=lambda *_, i=index: self._remove_replacement(i)
-        )
-        box.append(frm)
-        box.append(kit.text(messages.SET_BECOMES, "lt-muted"))
-        box.append(to)
-        spacer = Gtk.Box()
-        spacer.set_hexpand(True)
-        box.append(spacer)
-        box.append(remove)
-        return box
-
-    def _add_replacement_row(self):
-        box = Gtk.Box(spacing=8)
-        self.new_from = kit.entry(
-            placeholder=messages.SET_FROM, accessible_name=messages.SET_FROM, width_chars=10
-        )
-        self.new_to = kit.entry(placeholder=messages.SET_TO, accessible_name=messages.SET_TO, width_chars=10)
-        self.replacement_note = kit.text("", "lt-error-text")
-        self.new_to.connect("activate", lambda *_a: self._add_replacement())
-        add = kit.button(messages.SET_ADD_REPLACEMENT, on_click=lambda *_a: self._add_replacement())
-        box.append(self.new_from)
-        box.append(kit.text(messages.SET_BECOMES, "lt-muted"))
-        box.append(self.new_to)
-        spacer = Gtk.Box()
-        spacer.set_hexpand(True)
-        box.append(spacer)
-        box.append(add)
-        return box
-
-    def _add_replacement(self):
-        frm = self.new_from.get_text().strip()
-        to = self.new_to.get_text().strip()
-        if not frm:
-            self.replacement_note.set_text(messages.SET_REPLACEMENT_NEEDS_FROM)
-            return
-        rows = list(user_settings.get_settings().get("char_replacements") or [])
-        rows.append({"from": frm, "to": to})
-        user_settings.save_settings({"char_replacements": rows})
-        self._paint_replacements()
-
-    def _save_replacement(self, index, key, entry):
-        rows = list(user_settings.get_settings().get("char_replacements") or [])
-        if index < len(rows):
-            rows[index][key] = entry.get_text()
-            user_settings.save_settings({"char_replacements": rows})
-
-    def _remove_replacement(self, index):
-        rows = list(user_settings.get_settings().get("char_replacements") or [])
-        if index < len(rows):
-            del rows[index]
-            user_settings.save_settings({"char_replacements": rows})
-            self._paint_replacements()
-
     # ================================================================ Tools
     def _build_tools_card(self):
         card = kit.Card(messages.SET_CARD_TOOLS)
@@ -629,7 +457,7 @@ class SettingsPage(Gtk.Box):
             )
         )
         card.add_row(
-            kit.hbox(
+            button_flow(
                 kit.button(messages.SET_SHORTCUTS, on_click=self._show_shortcuts),
                 kit.button(messages.SET_HELP, on_click=self._show_help),
                 kit.button(messages.SET_CREDITS, on_click=self._show_credits),

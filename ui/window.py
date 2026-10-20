@@ -27,12 +27,15 @@ from modules.config import user_settings  # noqa: E402
 from ui import icons, messages, style  # noqa: E402
 from ui.pages.activity import ActivityPage  # noqa: E402
 from ui.pages.download import DownloadPage  # noqa: E402
+from ui.pages.file_control import FileControlPage  # noqa: E402
 from ui.pages.library import LibraryPage  # noqa: E402
 from ui.pages.settings import SettingsPage  # noqa: E402
 
 # The app's own icons (rail, cards) must resolve however the window is created
 # (entry point, tests, tools/shot_states.py); registering twice is harmless.
 icons.register()
+DEFAULT_W, DEFAULT_H = 1040, 720  # first-open size: two panes, fits a 1366×768 laptop
+
 
 _windows = weakref.WeakSet()
 _dispatch_installed = False
@@ -114,8 +117,11 @@ class AppStatusChip(kit.StatusChip):
 class MainWindow(DashboardWindow):
     def __init__(self, application):
         super().__init__(application, messages.APP_NAME, "download-simple")
+        self.tray = None  # ui.app.App sets the panel icon once the window exists
         style.install()  # after the shell: the display is open, the window class exists
-        self.set_default_size(1200, 800)
+        # a modest first size; the window only grows when the user drags it (content shortens
+        # with ellipses instead of widening it)
+        self.set_default_size(DEFAULT_W, DEFAULT_H)
         self._tools = tools_chip()
 
         self.download_page = DownloadPage(self)
@@ -129,6 +135,8 @@ class MainWindow(DashboardWindow):
         self.add_page("activity", messages.PAGE_ACTIVITY, "clock-counter-clockwise", self.activity_page)
         self.library_page = LibraryPage(self)
         self.add_page("library", messages.PAGE_LIBRARY, "music-notes", self.library_page)
+        self.file_control_page = FileControlPage(self)
+        self.add_page("file_control", messages.PAGE_FILE_CONTROL, "files", self.file_control_page)
         self.settings_page = SettingsPage(self)
         self.add_page(
             "settings",
@@ -183,6 +191,11 @@ class MainWindow(DashboardWindow):
         elif folder:
             self.library_page.select_by_path(folder)
 
+    def open_in_file_control(self, playlist_path):
+        """The Library's "Rename files": File Control, on that playlist"""
+        self.show_page("file_control")
+        self.file_control_page.show_playlist(playlist_path)
+
     def show_page(self, page_id):
         super().show_page(page_id)
         if page_id == "library":
@@ -199,8 +212,11 @@ class MainWindow(DashboardWindow):
         self.reset_chip()
 
     def set_chip(self, text, key):
-        """Show a status sentence with a kit status key (icon + word + detail)"""
+        """Show a status sentence with a kit status key (icon + word + detail); the panel
+        icon's tooltip and menu say the same while the window is hidden"""
         self.chip.set_status(text, key)
+        if self.tray is not None:
+            self.tray.set_status(text)
 
     def reset_chip(self):
         """Back to the start-up tools status"""

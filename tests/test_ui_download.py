@@ -277,6 +277,7 @@ def test_download_runs_and_finishes(page, monkeypatch, tmp_path):
 
     monkeypatch.setattr(file_utils, "open_folder", lambda folder: opened.update(folder=folder) or {})
     page.open_done_folder()
+    # no file names in this snapshot: the download folder itself opens
     assert opened["folder"] == submitted["options"]["output_dir"]
 
 
@@ -595,15 +596,25 @@ def test_typing_in_download_another_reads_it_too(page, monkeypatch):
     assert calls.count(URL) == 2 and messages.DOWNLOAD in button_label(page.primary_btn)
 
 
-def test_open_folder_goes_to_the_playlist_folder(page, monkeypatch, tmp_path):
-    """Open folder opens the folder the files went into, not the base download folder"""
-    opened = []
-    monkeypatch.setattr(download_module.file_utils, "open_folder", opened.append)
+def test_open_folder_highlights_the_playlist_folder(page, monkeypatch, tmp_path):
+    """Open folder shows the playlist's own folder selected in the download folder"""
+    shown = []
+    monkeypatch.setattr(download_module.file_utils, "show_items", shown.append)
     playlist = tmp_path / "Base" / "Classics_playlist"
     page._done_folder = str(tmp_path / "Base")
     page._done_files = [str(playlist / "1.mp3"), str(playlist / "2.mp3")]
     page.open_done_folder()
-    assert opened == [str(playlist)]
+    assert shown == [[str(playlist)]]
+
+
+def test_open_folder_highlights_a_single_file(page, monkeypatch, tmp_path):
+    """A file saved straight into the download folder is shown selected"""
+    shown = []
+    monkeypatch.setattr(download_module.file_utils, "show_items", shown.append)
+    page._done_folder = str(tmp_path / "Base")
+    page._done_files = [str(tmp_path / "Base" / "Song.mp3")]
+    page.open_done_folder()
+    assert shown == [[str(tmp_path / "Base" / "Song.mp3")]]
 
 
 def test_done_pill_has_no_icon():
@@ -611,3 +622,83 @@ def test_done_pill_has_no_icon():
     from ui.widgets import track_list
 
     assert track_list.ACTIVE_PILLS["done"][0] is None
+
+
+def test_show_items_asks_the_file_manager_to_select_them(monkeypatch):
+    """FileManager1.ShowItems gets every item as a file:// URI (folders too)"""
+    import importlib
+
+    import modules.utils.file_utils as real  # the autouse guard patched the module's names
+
+    real = importlib.reload(real)
+    calls = []
+    monkeypatch.setattr(real.subprocess, "run", lambda args, **kw: calls.append(args))
+    assert real.show_items(["/m/A B/", "/m/x.mp3"]) == {"status": "success"}
+    assert "org.freedesktop.FileManager1.ShowItems" in calls[0]
+    assert "['file:///m/A%20B', 'file:///m/x.mp3']" in calls[0]
+
+
+def test_done_ring_is_half_size_as_a_whole(page):
+    """The whole done graphic is half size, ring and check together (user, 2026-10-19)"""
+    from ui.widgets import ring
+
+    assert page.done_ring.get_content_width() == ring.SIZE // 2
+    assert page.ring.get_content_width() == ring.SIZE  # the progress ring keeps its size
+
+
+def fake_queue(monkeypatch):
+    """jobs.submit_download / queue_snapshot over an in-memory list"""
+    queue = []
+
+    def submit(url, options):
+        job = {"id": len(queue) + 1, "url": url, "title": "", "options": options,
+               "status": "active" if not queue else "queued"}
+        queue.append(job)
+        if job["status"] == "active":
+            return {"status": "started", "job_id": job["id"]}
+        return {"status": "queued", "job_id": job["id"], "position": len(queue) - 1}
+
+    monkeypatch.setattr(jobs, "submit_download", submit)
+    monkeypatch.setattr(jobs, "queue_snapshot", lambda: [dict(j) for j in queue])
+    monkeypatch.setattr(jobs, "remove_queued", lambda job_id: queue.remove(next(j for j in queue if j["id"] == job_id)))
+    return queue
+
+
+def test_several_pasted_links_are_all_queued(page, monkeypatch):
+    queue = fake_queue(monkeypatch)
+    page.poller.start = lambda: None  # no real polling in this test
+    page.link_entry.set_text(
+        "https://www.youtube.com/playlist?list=PLaaa\nhttps://youtu.be/bbb, https://www.youtube.com/watch?v=ccc"
+    )
+    page._read_now()
+    assert [j["url"] for j in queue] == [
+        "https://www.youtube.com/playlist?list=PLaaa",
+        "https://youtu.be/bbb",
+        "https://www.youtube.com/watch?v=ccc",
+    ]
+    assert queue[0]["options"]["playlist_mode"] == "playlist"  # a playlist page downloads whole
+    assert queue[1]["options"]["playlist_mode"] == "single"
+    assert page.link_entry.get_text() == ""
+    assert messages.QUEUED_LINKS.format(n=3) in page.queue_message.get_text()
+
+
+def test_queue_card_lists_waiting_links_and_removes_one(page, monkeypatch):
+    queue = fake_queue(monkeypatch)
+    page.poller.start = lambda: None
+    page.queue_entry.set_text("https://youtu.be/one https://youtu.be/two https://youtu.be/three")
+    page._add_to_queue()
+    rows = []
+    for row in _children(page.queue_list):
+        rows += [row.get_text()] if isinstance(row, Gtk.Label) else [
+            w.get_text() for w in _children(row) if isinstance(w, Gtk.Label)
+        ]
+    assert rows[0] == messages.QUEUE_UP_NEXT
+    assert "1. https://youtu.be/two" in rows and "2. https://youtu.be/three" in rows
+    page._remove_queued(queue[1])
+    assert [j["url"] for j in queue] == ["https://youtu.be/one", "https://youtu.be/three"]
+
+
+def test_one_link_is_still_read_first(page, monkeypatch):
+    queue = fake_queue(monkeypatch)
+    calls = read_link(page, monkeypatch, result=fake_preview())
+    assert queue == [] and calls  # one link: read and previewed, nothing queued yet

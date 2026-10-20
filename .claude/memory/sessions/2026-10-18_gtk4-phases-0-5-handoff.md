@@ -9,9 +9,9 @@ session: GTK 4 upgrade, Phases 0–5 (handoff)
 - The user's verdict: "most functionality is working; a few features still need work".
 
 ## How to work here
-- Tests: `DISPLAY=:0 GSK_RENDERER=cairo venv/bin/python -m pytest -q` (263 pass); headless skips display tests.
+- Tests: `DISPLAY=:0 GSK_RENDERER=cairo venv/bin/python -m pytest -q` (297 pass); headless skips display tests.
   Commit only on exit code 0 (never pipe pytest through `tail` before checking it).
-- Renders: `tools/shot_states.py --state {ready,downloading,done,error,narrow,activity,library,library-tidy,confirm-trash,settings} --out PNG`.
+- Renders: `tools/shot_states.py --state {ready,downloading,done,error,narrow,activity,library,file-control,confirm-trash,settings} --out PNG`.
 - Log: ~/.local/share/linmediadownloader/logs/app.log (environment, every download start/end, uncaught exceptions).
 - Data dir ~/.local/share/linmediadownloader (`LMD_DATA_DIR`); downloads ~/Music/LinMediaDownloads (Settings).
 - YouTube: VPN exit IP triggers the bot check; the app uses the signed-in browser automatically
@@ -34,7 +34,23 @@ session: GTK 4 upgrade, Phases 0–5 (handoff)
   README leads with all three. Branch in URLs/defaults is feat/2.0-gtk4 until the merge (pending.md).
 - Deno (PyPI) is the JS runtime in every venv; the dev venv has it too. 271 tests.
 
+## User rounds 4–5 (2026-10-19)
+- Window: opens 1040×720 and never widens by itself; minimum 933 px wide, 795 px single-column
+  (labels with data ellipsize or wrap; button rows wrap via ui/widgets/button_flow.py).
+- Open folder / Show file select the item in the file manager (file_utils.show_items, FileManager1.ShowItems).
+  Tests must never reach the real file manager: conftest's autouse guard raises unless a test patches it.
+- New File Control page (Alt+4, ui/pages/file_control.py): every renaming tool, preview, undo/redo, filler
+  words and replacements (moved out of Library and Settings). Library: plain playlist numbers to 99999,
+  search, Show filter, tick boxes + Delete N (to trash, with confirm).
+- Panel icon (ui/tray.py): StatusNotifierItem + dbusmenu in pure Gio (XApp/Ayatana are GTK 3). Closing while
+  a download runs or waits hides to the panel; LMD_NO_TRAY=1 disables. Registered and driven on Cinnamon;
+  its look in the panel is not yet confirmed by the user.
+- Several links pasted at once are all queued (modules/download/links.py); the queue card lists them.
+- Done ring is half size (ProgressRing(scale=0.5)). Manifest: changes/2026-10-19_width-file-control-library-tools.md.
+- 297 tests pass; pyflakes clean. Restart the running app to load the new code.
+
 ## What's next
-See pending.md "Backlog after Phase 5": Phase 6 packaging, Phase 7 verify, real-use checks of Settings,
+See pending.md "Backlog after Phase 5": user checks of rounds 4–5 (panel icon look, hide while
+downloading, Nemo highlight, File Control and tick-delete on real files), rest of Phase 6 (1.x web code, AppImage), Phase 7 verify, real-use checks of Settings,
 queue hand-over, playback deps, file-name style decision. Waiting on the user: upstream the kit branch to
 linapptemplate; `sudo apt install xvfb libgtk-4-media-gstreamer`.

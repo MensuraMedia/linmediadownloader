@@ -376,7 +376,11 @@ class ActivityPage(Gtk.Box):
         title = kit.text(entry["title"], "lt-strong")
         title.set_ellipsize(3)
         words.append(title)
-        words.append(kit.text(self._entry_caption(entry), "lt-caption"))
+        # the caption holds the save folder: a long path must shorten, never widen the window
+        caption = kit.text(self._entry_caption(entry), "lt-caption")
+        caption.set_ellipsize(2)  # middle: keeps the kind and the end of the folder
+        caption.set_tooltip_text(caption.get_text())
+        words.append(caption)
         row.append(words)
         pill = _pill_words(entry["result"])
         pill.set_valign(Gtk.Align.CENTER)

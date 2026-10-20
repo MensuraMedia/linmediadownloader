@@ -35,10 +35,12 @@ def _rgb(hex_color):
 class ProgressRing(Gtk.DrawingArea):
     """set_progress(fraction, done, total) while downloading; set_complete(total) after."""
 
-    def __init__(self):
+    def __init__(self, scale=1.0):
+        """scale draws the whole ring smaller or larger (the done ring is half size)"""
         super().__init__()
-        self.set_content_width(SIZE)  # no set_content_size() in this python3-gi
-        self.set_content_height(SIZE)
+        self._scale = scale
+        self.set_content_width(round(SIZE * scale))  # no set_content_size() in this python3-gi
+        self.set_content_height(round(SIZE * scale))
         self.set_draw_func(self._draw)
         self._fraction = 0.0
         self._done_count = 0
@@ -74,6 +76,7 @@ class ProgressRing(Gtk.DrawingArea):
 
     # -- drawing
     def _draw(self, area, cr, width, height):
+        cr.scale(self._scale, self._scale)  # everything below is drawn on the 168 px grid
         cx = cy = SIZE / 2
         cr.set_line_width(STROKE)
         cr.set_line_cap(cairo.LINE_CAP_ROUND)

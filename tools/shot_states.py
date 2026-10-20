@@ -428,18 +428,14 @@ def apply_library_state(window):
     return patches
 
 
-def apply_library_tidy_state(window):
-    # The popover is opened by open_tidy_popover() once the window is on screen:
-    # popping it up under an unmapped window hangs GTK 4.
-    return apply_library_state(window)
-
-
-def open_tidy_popover(window):
-    """Open Tidy names with a preview showing, like the mockup"""
-    page = window.library_page
-    page.tidy_button.popup()
-    page.tidy_button.get_popover().get_child().select("remove_filler")
-    return False
+def apply_file_control_state(window):
+    """File Control on the AKIRA playlist with "Remove filler words" previewed"""
+    patches = apply_library_state(window)
+    window.show_page("file_control")
+    page = window.file_control_page
+    page.refresh()
+    page.select("remove_filler")
+    return patches
 
 
 def apply_confirm_trash_state(window):
@@ -544,7 +540,7 @@ def main():
             "narrow",
             "activity",
             "library",
-            "library-tidy",
+            "file-control",
             "confirm-trash",
             "settings",
         ],
@@ -565,7 +561,7 @@ def main():
         if args.state in (
             "activity",
             "library",
-            "library-tidy",
+            "file-control",
             "confirm-trash",
             "settings",
         ):
@@ -575,8 +571,8 @@ def main():
             apply_activity_state(window)
         elif args.state == "library":
             apply_library_state(window)
-        elif args.state == "library-tidy":
-            apply_library_tidy_state(window)
+        elif args.state == "file-control":
+            apply_file_control_state(window)
         elif args.state == "confirm-trash":
             _patches, dialogs = apply_confirm_trash_state(window)
         elif args.state == "settings":
@@ -594,9 +590,6 @@ def main():
             logger.info("saved %s (%s)", args.out, args.state)
             # a popover and a confirm are separate surfaces: the main shot cannot
             # show them, so each is rendered beside it as its own PNG
-            if args.state == "library-tidy":
-                tidy = window.library_page.tidy_button.get_popover().get_child()
-                shoot_widget(tidy, f"{args.out}-popover.png")
             if args.state == "confirm-trash" and dialogs:
                 shoot_widget(dialogs[0], f"{args.out}-dialog.png")
             window.download_page.poller.stop()
@@ -605,8 +598,6 @@ def main():
             return False
 
         window.present()
-        if args.state == "library-tidy":
-            GLib.timeout_add(500, open_tidy_popover, window)
         GLib.timeout_add(1200, shoot)
 
     app.connect("activate", activate)

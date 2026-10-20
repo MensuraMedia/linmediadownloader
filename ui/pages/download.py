@@ -25,10 +25,11 @@ from gi.repository import Gio, GLib, Gtk  # noqa: E402
 from lintheme import tokens  # noqa: E402
 from lintheme.gtk4 import components as kit  # noqa: E402
 from modules.config import settings  # noqa: E402
-from modules.download import access, jobs, preview  # noqa: E402
+from modules.download import access, jobs, links, preview  # noqa: E402
 from modules.utils import file_utils  # noqa: E402
 from ui import messages  # noqa: E402
 from ui.poller import ACTIVE_STATUSES, SnapshotPoller, snapshot_copy  # noqa: E402
+from ui.widgets.button_flow import button_flow  # noqa: E402
 from ui.widgets.ring import ProgressRing  # noqa: E402
 from ui.widgets.track_list import TrackList  # noqa: E402
 
@@ -37,6 +38,8 @@ logger = logging.getLogger("lmd.ui.download")
 C = tokens.COLOR
 TYPE_DELAY_MS = 600  # reading starts this long after typing stops
 OPTIONS_WIDE_W = tokens.LAYOUT["options_min"]  # the options column never gets narrower
+DONE_RING_SCALE = 0.5  # the whole done graphic, ring and check, at half size (user, 2026-10-19)
+LABEL_W = 64  # option labels ("Get", "Quality"): narrower than the kit default so both halves fit 960 px
 AUDIO_BYTES_PER_SECOND = 24_000  # 192 kbps CBR audio, for "about N MB" estimates
 
 
@@ -274,6 +277,7 @@ class DownloadPage(Gtk.Box):
         self.left_scroll = kit.scrolled(self._build_left_column())
         self.left_scroll.set_hexpand(True)
         self.left_scroll.set_size_request(OPTIONS_WIDE_W, -1)
+        kit.css(self.left_scroll, "lmd-options")  # option labels take LABEL_W, not the kit's 84 px
         content.append(self.left_scroll)
         content.append(self._build_right_pane())
         self.append(content)
@@ -340,7 +344,7 @@ class DownloadPage(Gtk.Box):
             self._on_quality_changed,
             messages.QUALITY_NAME,
         )
-        self.quality_row = kit.field_row(messages.FIELD_QUALITY, self.quality_seg)
+        self.quality_row = kit.field_row(messages.FIELD_QUALITY, self.quality_seg, label_width=LABEL_W)
         self.quality_row.set_visible(False)
         self.format_card.add_row(self.quality_row)
         box.append(self.format_card)
@@ -358,6 +362,8 @@ class DownloadPage(Gtk.Box):
 
         self.save_card = kit.Card(messages.CARD_SAVE)
         self.folder_label = kit.text(tilde(self.folder))
+        self.folder_label.set_ellipsize(1)  # start: a deep folder keeps its own name in view
+        self.folder_label.set_hexpand(True)
         folder_box = kit.css(
             kit.hbox(kit.icon("folder-simple", 18, C["text_muted"]), self.folder_label, spacing=8),
             "lt-entry",
@@ -409,7 +415,7 @@ class DownloadPage(Gtk.Box):
             self.stepper_holder = Gtk.Box()
             self.stepper = None
             self.limit_value = 0
-        self.get_controls.append(kit.field_row(messages.FIELD_GET, self.get_seg))
+        self.get_controls.append(kit.field_row(messages.FIELD_GET, self.get_seg, label_width=LABEL_W))
         self.get_controls.append(self.stepper_holder)
         self.get_controls.append(self.skip_long_row)
         self.get_controls.append(self.dupes_row)
@@ -440,18 +446,23 @@ class DownloadPage(Gtk.Box):
         box.append(self.ring_card)
 
         self.queue_card = kit.Card(messages.QUEUE_TITLE)
-        self.queue_card.add_row(kit.text(messages.QUEUE_NOTE, "lt-caption"))
+        self.queue_card.add_row(kit.text(messages.QUEUE_NOTE_MANY, "lt-caption", wrap=True))
         self.queue_entry = kit.entry(
             placeholder=messages.LINK_PLACEHOLDER,
             accessible_name=messages.QUEUE_ENTRY_NAME,
             width_chars=24,
         )
         self.queue_entry.set_hexpand(True)
+        self.queue_entry.connect("activate", lambda *_a: self._add_to_queue())
         queue_paste = kit.button(messages.PASTE, on_click=self._paste_queue, icon_name="clipboard-text")
         self.queue_card.add_row(kit.hbox(self.queue_entry, queue_paste))
         self.queue_message = kit.text("", "lt-caption")
         self.queue_card.add_row(self.queue_message)
         self.queue_card.add_row(kit.button(messages.ADD_TO_QUEUE, on_click=self._add_to_queue))
+        # the links still waiting, each removable: continuous downloading at a glance
+        self.queue_list = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        self._queue_shown = None
+        self.queue_card.add_row(self.queue_list)
         box.append(self.queue_card)
 
         self.this_card = kit.Card(messages.THIS_DOWNLOAD)
@@ -468,7 +479,7 @@ class DownloadPage(Gtk.Box):
         self.done_card.set_valign(Gtk.Align.START)
         self.done_title = kit.text("", "lt-heading")
         self.done_title.set_halign(Gtk.Align.CENTER)
-        self.done_ring = ProgressRing()
+        self.done_ring = ProgressRing(scale=DONE_RING_SCALE)
         self.done_ring.set_halign(Gtk.Align.CENTER)
         self.done_headline = kit.text("", "lt-title")
         self.done_headline.set_halign(Gtk.Align.CENTER)
@@ -497,7 +508,7 @@ class DownloadPage(Gtk.Box):
             self.done_headline,
             self.done_stats,
             self.done_saved,
-            kit.hbox(play, self.done_show, activity, spacing=8),
+            button_flow(play, self.done_show, activity),
         ):
             self.done_card.add_row(widget)
         box.append(self.done_card)
@@ -518,7 +529,7 @@ class DownloadPage(Gtk.Box):
             icon_name="clipboard-text",
         )
         self.another_card.add_row(kit.hbox(self.another_entry, another_paste))
-        self.another_note = kit.text("", "lt-caption")
+        self.another_note = kit.text("", "lt-caption", wrap=True)
         self.another_card.add_row(self.another_note)
         box.append(self.another_card)
         return box
@@ -588,7 +599,10 @@ class DownloadPage(Gtk.Box):
         if self._typing_timer is not None:
             GLib.source_remove(self._typing_timer)
             self._typing_timer = None
-        self.start_read(self.link_entry.get_text().strip())
+        text = self.link_entry.get_text().strip()
+        if self._queue_if_many(self.link_entry, text):
+            return
+        self.start_read(text)
 
     def start_read(self, url):
         """Read the link in a worker thread (Enter, Paste, or after typing stops)"""
@@ -708,7 +722,7 @@ class DownloadPage(Gtk.Box):
         self._paste_into(self.link_entry, then=self._read_now)
 
     def _paste_queue(self):
-        self._paste_into(self.queue_entry)
+        self._paste_into(self.queue_entry, then=self._add_to_queue)
 
     def _paste_into(self, entry, then=None):
         def chosen(source, result):
@@ -993,32 +1007,100 @@ class DownloadPage(Gtk.Box):
         logger.info("submitted %s (job %s, %s)", url, meta["job_id"], result.get("status"))
 
     def _add_to_queue(self):
-        url = self.queue_entry.get_text().strip()
-        if not url:
+        text = self.queue_entry.get_text().strip()
+        urls = links.links_in(text) or ([text] if text else [])
+        if not urls:
             kit.set_invalid(self.queue_entry, True, self.queue_message, messages.QUEUE_EMPTY)
             return
         kit.set_invalid(self.queue_entry, False, self.queue_message, "")
-        options = self._options_for(url)
-        try:
-            result = jobs.submit_download(url, options)
-        except Exception:
-            logger.exception("queueing a second link failed")
-            return
-        meta = {
-            "job_id": result.get("job_id"),
-            "url": url,
-            "options": options,
-            "title": "",
-            "started": None,
-        }
-        if meta["job_id"] is not None:
-            self._submitted[meta["job_id"]] = meta
         self._setting_text = True
         self.queue_entry.set_text("")
         self._setting_text = False
-        self.queue_message.set_text(messages.QUEUE_WAITING.format(n=max(result.get("position") or 1, 1)))
+        self.queue_links(urls)
+
+    def _queue_if_many(self, entry, text):
+        """Several links pasted at once are all queued with the current choices and
+        download one after another; one link is read and previewed as before."""
+        urls = links.links_in(text)
+        if len(urls) < 2:
+            return False
+        self._setting_text = True
+        entry.set_text("")
+        self._setting_text = False
+        queued = self.queue_links(urls)
+        if self.state != "downloading":
+            self._set_link_status(kit.status_line("busy", messages.QUEUED_LINKS.format(n=queued)))
+        return True
+
+    def _queued_options(self, url):
+        """Choices for a link queued without a preview: the current format and filters;
+        a playlist page downloads whole, any other link as one video"""
+        options = self._options_for(url)
+        if self.preview and self.preview.get("url") == url:
+            return options  # read and shown: the page's own playlist choice applies
+        options["playlist_mode"] = "playlist" if links.is_playlist_link(url) else "single"
+        options["limit"] = 0
+        return options
+
+    def queue_links(self, urls):
+        """Submit each link; the first starts if nothing runs. Returns how many were queued."""
+        queued = 0
+        for url in urls:
+            options = self._queued_options(url)
+            try:
+                result = jobs.submit_download(url, options)
+            except Exception:
+                logger.exception("queueing %s failed", url)
+                continue
+            queued += 1
+            meta = {"job_id": result.get("job_id"), "url": url, "options": options, "title": "", "started": None}
+            if meta["job_id"] is not None:
+                self._submitted[meta["job_id"]] = meta
+            logger.info("queued %s (job %s, %s)", url, result.get("job_id"), result.get("status"))
+        waiting = self._paint_queue_list()
+        self.queue_message.set_text(
+            messages.QUEUED_LINKS.format(n=queued) if queued > 1 else messages.QUEUE_WAITING.format(n=max(waiting, 1))
+        )
         self.poller.start()
-        logger.info("queued %s (job %s)", url, result.get("job_id"))
+        return queued
+
+    def _paint_queue_list(self, force=True):
+        """The waiting links under the queue card; returns how many wait"""
+        try:
+            waiting = [j for j in jobs.queue_snapshot() if j.get("status") == "queued"]
+        except Exception:
+            logger.exception("reading the queue failed")
+            waiting = []
+        shown = tuple(j.get("id") for j in waiting)
+        if not force and shown == self._queue_shown:
+            return len(waiting)
+        self._queue_shown = shown
+        child = self.queue_list.get_first_child()
+        while child:
+            nxt = child.get_next_sibling()
+            self.queue_list.remove(child)
+            child = nxt
+        if waiting:
+            self.queue_list.append(kit.text(messages.QUEUE_UP_NEXT, "lt-caption"))
+        for index, job in enumerate(waiting, 1):
+            title = job.get("title") or job.get("url") or ""
+            words = kit.text(f"{index}. {title}")
+            words.set_ellipsize(2)  # middle: a link keeps its start and its id
+            words.set_hexpand(True)
+            words.set_tooltip_text(job.get("url") or title)
+            remove = kit.icon_button(
+                "x", messages.QUEUE_REMOVE.format(title=title), on_click=lambda *_a, j=job: self._remove_queued(j)
+            )
+            self.queue_list.append(kit.hbox(words, remove, spacing=8))
+        return len(waiting)
+
+    def _remove_queued(self, job):
+        try:
+            jobs.remove_queued(job.get("id"))
+        except Exception:
+            logger.exception("removing a queued job failed")
+        waiting = self._paint_queue_list()
+        self.queue_message.set_text(messages.QUEUE_WAITING.format(n=waiting) if waiting else "")
 
     def _on_another_changed(self, *_a):
         if self._setting_text:
@@ -1036,7 +1118,7 @@ class DownloadPage(Gtk.Box):
         """A link in "Download another": it becomes the Link card's link and is read, so the
         options and the Download button come back for it"""
         url = self.another_entry.get_text().strip()
-        if not url:
+        if not url or self._queue_if_many(self.another_entry, url):
             return
         self._setting_text = True
         self.link_entry.set_text(url)
@@ -1218,6 +1300,7 @@ class DownloadPage(Gtk.Box):
         )
         waiting = snap.get("queue_pending") or 0
         self.queue_message.set_text(messages.QUEUE_WAITING.format(n=waiting) if waiting else "")
+        self._paint_queue_list(force=False)
         eta = fmt_eta_left(snap.get("eta"))
         words = (
             messages.AB_BUSY.format(i=index, M=total or index, eta=eta)
@@ -1663,10 +1746,17 @@ class DownloadPage(Gtk.Box):
             self.actionbar.add_action(self.primary_btn)
 
     def open_done_folder(self):
-        """Open the folder the files went into: a playlist's own folder, not the base folder"""
-        folder = self._saved_folder() or self._done_folder or self.folder
+        """Show where the download went, selected in the file manager: a playlist's own
+        folder (highlighted inside the downloads folder), or the saved file itself"""
+        folder = self._saved_folder()
+        base = os.path.normpath(self._done_folder or self.folder)
         try:
-            result = file_utils.open_folder(folder)
+            if folder and os.path.normpath(folder) != base:
+                result = file_utils.show_items([folder])  # the playlist's folder
+            elif self._done_files:
+                result = file_utils.show_items(self._done_files)  # the file(s) themselves
+            else:
+                result = file_utils.open_folder(folder or base)
         except Exception:
             logger.exception("opening the folder failed")
             return

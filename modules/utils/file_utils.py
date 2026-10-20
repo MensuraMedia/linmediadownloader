@@ -64,23 +64,31 @@ def open_folder(folder_path):
 
 
 def show_file(file_path):
-    """Open the file manager at a file with the file selected.
+    """Open the file manager at a file with the file selected"""
+    return show_items([file_path])
 
-    Uses the freedesktop FileManager1 D-Bus interface (Nemo, Nautilus, Dolphin…);
-    falls back to opening the folder when no file manager answers.
+
+def show_items(paths):
+    """Open the file manager at the items' folder with the items selected.
+
+    Works for files and folders (a folder is shown selected inside its parent). Uses the
+    freedesktop FileManager1 D-Bus interface (Nemo, Nautilus, Dolphin…); falls back to
+    opening the first item's folder when no file manager answers.
     """
-    file_path = os.path.abspath(file_path)
+    from urllib.parse import quote
+    paths = [os.path.abspath(path).rstrip(os.sep) or os.sep for path in paths if path]
+    if not paths:
+        return {"status": "error", "message": "Nothing to show"}
     try:
-        from urllib.parse import quote
-        uri = 'file://' + quote(file_path)
+        uris = ", ".join("'file://" + quote(path) + "'" for path in paths)
         subprocess.run(
             ['gdbus', 'call', '--session', '--dest', 'org.freedesktop.FileManager1',
              '--object-path', '/org/freedesktop/FileManager1',
-             '--method', 'org.freedesktop.FileManager1.ShowItems', f"['{uri}']", ''],
+             '--method', 'org.freedesktop.FileManager1.ShowItems', f"[{uris}]", ''],
             check=True, capture_output=True, timeout=5,
         )
-        logger.info('Showed %s in the file manager', file_path)
+        logger.info('Showed %s in the file manager', paths)
         return {"status": "success"}
     except Exception as e:
-        logger.info('FileManager1 could not show %s (%s); opening its folder', file_path, e)
-        return open_folder(os.path.dirname(file_path))
+        logger.info('FileManager1 could not show %s (%s); opening its folder', paths, e)
+        return open_folder(os.path.dirname(paths[0]))

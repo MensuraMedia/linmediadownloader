@@ -21,3 +21,16 @@ requires_display = pytest.mark.skipif(
     not os.environ.get('DISPLAY') and not os.environ.get('WAYLAND_DISPLAY'),
     reason='no display: run with a desktop session or xvfb-run -a',
 )
+
+
+@pytest.fixture(autouse=True)
+def _no_file_manager(monkeypatch):
+    """Tests never open the user's file manager: a test that checks what would be shown
+    patches these itself; any other call fails loudly instead of opening a window."""
+    from modules.utils import file_utils
+
+    def refuse(*args, **kwargs):
+        raise AssertionError(f"a test tried to open the file manager: {args}")
+
+    for name in ("open_folder", "show_file", "show_items"):
+        monkeypatch.setattr(file_utils, name, refuse)

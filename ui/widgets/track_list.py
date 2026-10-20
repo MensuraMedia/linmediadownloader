@@ -24,7 +24,10 @@ AUDIO_BYTES_PER_SECOND = 192_000 / 8  # the MP3 bitrate the download uses
 
 C = tokens.COLOR
 PILL_WIDE = 148  # fits "Downloading · 100%"; half the window holds status + name + length + size
-SIZE_CHARS = 8
+SIZE_CHARS = 7
+LENGTH_CHARS = 5  # "12:34"; an hour-long track widens its own cell
+ROW_GAP = 8  # between a row's cells; header cells use the same gap
+BAR_W = 72  # the track bar; small so a row fits half a narrow window
 COMPACT_HEIGHT = 420
 
 # state -> (icon, message template, pill kind, dim)
@@ -66,7 +69,7 @@ class TrackRow(Gtk.Box):
     """One recycled row; bind(item) wires it to a TrackItem's properties."""
 
     def __init__(self):
-        super().__init__(spacing=12)
+        super().__init__(spacing=ROW_GAP)
         kit.css(self, "lt-row")
         self._item, self._handlers, self._shown_pct = None, [], None
         title_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)  # every cell shares one centre
@@ -76,7 +79,7 @@ class TrackRow(Gtk.Box):
         self.title.set_hexpand(True)
         self.bar = Gtk.ProgressBar()
         self.bar.set_hexpand(False)
-        self.bar.set_size_request(120, -1)
+        self.bar.set_size_request(BAR_W, -1)
         kit.name(self.bar, "Track progress")
         title_box.append(self.title)
         title_box.append(self.bar)
@@ -85,7 +88,7 @@ class TrackRow(Gtk.Box):
         self.pill_box.set_halign(Gtk.Align.START)
         self.pill_box.set_valign(Gtk.Align.CENTER)
         self.length = Gtk.Label(xalign=1.0)
-        self.length.set_width_chars(7)
+        self.length.set_width_chars(LENGTH_CHARS)
         self.length.set_valign(Gtk.Align.CENTER)
         self.size = kit.css(Gtk.Label(xalign=1.0), "lt-muted")
         self.size.set_width_chars(SIZE_CHARS)
@@ -186,14 +189,14 @@ class TrackList(Gtk.Box):
     def __init__(self):
         super().__init__(orientation=Gtk.Orientation.VERTICAL)
         kit.css(self, "lt-card", "lmd-list")
-        head = Gtk.Box(spacing=12)
+        head = Gtk.Box(spacing=ROW_GAP)
         kit.css(head, "lt-thead")
         status = Gtk.Label(label=messages.COL_STATUS, xalign=0.0)
         status.set_size_request(PILL_WIDE, -1)
         title = Gtk.Label(label=messages.COL_TITLE, xalign=0.0)
         title.set_hexpand(True)
         length = Gtk.Label(label=messages.COL_LENGTH, xalign=1.0)
-        length.set_width_chars(7)
+        length.set_width_chars(LENGTH_CHARS)
         size = Gtk.Label(label=messages.COL_SIZE, xalign=1.0)
         size.set_width_chars(SIZE_CHARS)
         for widget in (status, title, length, size):

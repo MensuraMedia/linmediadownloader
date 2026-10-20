@@ -3,11 +3,12 @@
 
 ## Session Logs
 <!-- Add newest first -->
-- [2026-10-18 GTK 4 Phases 0–5 handoff](sessions/2026-10-18_gtk4-phases-0-5-handoff.md) — 2.0 state, how to test/render, what's next
+- [2026-10-18 GTK 4 Phases 0–5 handoff](sessions/2026-10-18_gtk4-phases-0-5-handoff.md) — 2.0 state (through user round 5), how to test/render, what's next
 - [2026-07-31 onboarding + optimization](sessions/2026-07-31_onboarding-and-optimization.md) — Applied universal standards; fixed cancel bug, dead code, cleanup
 
 ## Changes
 <!-- Add newest first -->
+- [2026-10-19 width, File Control, Library tools](changes/2026-10-19_width-file-control-library-tools.md) — window never widens itself (1040×720, min 933/795); Open folder highlights; File Control page; Library search/filter/tick-delete; plain numbers
 - [2026-10-18 installers 2.0](changes/2026-10-18_installers-2.0.md) — install.sh, clone-and-install.sh, .deb for 2.0; Deno runtime; README install-first
 - [2026-10-18 polish: folder, pills, tiles](changes/2026-10-18_polish-folder-pills-tiles.md) — Open folder → playlist folder; no checkmarks in pills; centred Activity icons
 - [2026-10-18 Phases 3–5](changes/2026-10-18_phase3-5-activity-library-settings.md) — Activity, Library, Settings; per-process cookie copies; skips count as handled

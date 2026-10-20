@@ -35,16 +35,26 @@ def _tint_classes():
         ("muted", "text_muted"),
     ):
         rules.append(f".lmd-badge-{name} {{ background-color: {C[key]}; color: {C['on_accent']}; }}")
+        rules.append(f".lmd-seq-{name} {{ color: {C[key]}; }}")
     return "\n".join(rules)
 
 
 CSS = f"""
 .lmd-dim {{ opacity: 0.55; }}
+.lmd-seq {{ font-size: 20px; font-weight: 600; font-feature-settings: "tnum"; }}
+.lmd-seq.lmd-seq-large {{ font-size: 30px; }}
 .lt-icon-btn.lmd-tag-x {{ min-width: 32px; min-height: 32px; padding: 0; }}
 .lt-pill.lmd-tag {{ padding: 0 2px 0 10px; }}
 .lt-card.lmd-list {{ padding: 0; }}
-.lt-card.lmd-list .lt-row {{ padding: 0 16px; }}
-.lt-card.lmd-list .lt-thead {{ padding: 0 16px; }}
+.lt-card.lmd-list .lt-row {{ padding: 0 12px; }}
+.lt-card.lmd-list .lt-thead {{ padding: 0 12px; }}
+.lmd-options .lt-field-label {{ min-width: 0; }}
+.lmd-check check {{ min-width: 18px; min-height: 18px; border-radius: 4px; background-color: transparent;
+    border: 2px solid {C['border_strong']}; color: {C['on_accent']}; -gtk-icon-size: 14px; }}
+.lmd-check check:checked, .lmd-check check:indeterminate {{ background-color: {C['accent']}; border-color: {C['accent']}; }}
+.lmd-check:focus-visible check {{ outline: 2px solid {C['accent']}; outline-offset: 2px; }}
+.lt-card.lmd-list .lt-row progressbar > trough,
+.lt-card.lmd-list .lt-row progressbar > trough > progress {{ min-width: 0; }}
 .lmd-selected {{ background-color: {C['accent_soft']}; box-shadow: inset 0 0 0 2px {C['accent']}; }}
 .lmd-swatch {{ min-width: 44px; min-height: 32px; border-radius: 8px; border: 2px solid {C['border_strong']}; }}
 {_tint_classes()}

@@ -61,7 +61,7 @@ class PlayerBar(Gtk.Box):
         words = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         words.set_valign(Gtk.Align.CENTER)
         words.set_margin_start(4)
-        words.set_size_request(220, -1)
+        words.set_size_request(140, -1)  # the title shortens; 140 px keeps the bar inside a narrow window
         self.title = kit.text(messages.PLB_NOWHERE, "lt-strong")
         self.title.set_ellipsize(3)
         self.counts = kit.text("", "lt-caption")

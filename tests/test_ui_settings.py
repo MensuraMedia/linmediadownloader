@@ -24,7 +24,6 @@ from modules import tools  # noqa: E402
 from modules.config import user_settings  # noqa: E402
 from modules.download import access  # noqa: E402
 from ui import messages  # noqa: E402
-from ui.pages import settings as settings_module  # noqa: E402
 from ui.window import MainWindow  # noqa: E402
 
 PROFILE_PATH = "/home/user/.librewolf/30nh4ac4.default-default"
@@ -175,41 +174,10 @@ def window_follows(page):
     return download.download_type == "video" and download.quality == "480"
 
 
-def test_filler_word_add_and_remove(page):
-    words = lambda: user_settings.get_settings()["filler_words"]  # noqa: E731
-    page.word_entry.set_text("extraword")
-    page._add_word()
-    assert "extraword" in words()
-    page._remove_word("extraword")
-    assert "extraword" not in words()
-    assert messages.SET_WORD_ADDED in label_texts(page)
-
-
-def test_replacement_add_and_remove(page):
-    rows = lambda: user_settings.get_settings()["char_replacements"]  # noqa: E731
-    page.new_from.set_text("&")
-    page.new_to.set_text("and")
-    page._add_replacement()
-    assert rows() == [{"from": "&", "to": "and"}]
-    page._remove_replacement(0)
-    assert rows() == []
-
-
-def test_reset_asks_before_restoring_defaults(page, monkeypatch):
-    user_settings.save_settings({"filler_words": ["a", "b"], "char_replacements": [{"from": "x", "to": "y"}]})
-    asked = {}
-
-    def fake_confirm(_parent, title, _body, _label, **kwargs):
-        asked["title"] = title
-        asked["yes"] = kwargs.get("on_answer")
-
-    monkeypatch.setattr(settings_module.kit, "confirm", fake_confirm)
-    page._confirm_reset()
-    assert messages.SET_RESET_TITLE in asked["title"]
-    asked["yes"](True)
-    values = user_settings.get_settings()
-    assert values["filler_words"] == sorted(user_settings.DEFAULT_FILLER_WORDS)
-    assert values["char_replacements"] == []
+def test_renaming_controls_moved_to_file_control(page):
+    """Filler words and replacements live on File Control now (user, 2026-10-19)"""
+    assert not hasattr(page, "word_entry") and not hasattr(page, "replacements_box")
+    assert messages.SET_REPLACEMENTS not in label_texts(page)
 
 
 def test_signin_dropdown_saves_auto_profile_and_off(page, fake_backends):

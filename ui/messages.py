@@ -14,6 +14,7 @@ APP_NAME = "LinMediaDownloader"
 PAGE_DOWNLOAD = "Download"
 PAGE_ACTIVITY = "Activity"
 PAGE_LIBRARY = "Library"
+PAGE_FILE_CONTROL = "File Control"
 PAGE_SETTINGS = "Settings"
 COMING_LATER = "Coming in a later 2.0 phase"
 
@@ -266,7 +267,7 @@ LIB_TRASH_EMPTY = "Trash: empty"
 LIB_RENAME = "Rename {name}"
 LIB_RENAME_APPLY = "Apply"
 LIB_RENAME_CANCEL = "Cancel"
-LIB_BADGE_COLOUR = "Badge colour"
+LIB_BADGE_COLOUR = "Number colour"
 LIB_COLOUR_ACCENT = "Blue"
 LIB_COLOUR_OK = "Green"
 LIB_COLOUR_BUSY = "Light blue"
@@ -527,9 +528,62 @@ SHORTCUT_ROWS = (
     ("Esc", "Cancel the running download"),
     ("Ctrl+L", "Focus the link field"),
     ("Ctrl+V", "Paste a link"),
-    ("Alt+1 to 4", "Switch pages"),
+    ("Alt+1 to 5", "Switch pages"),
     ("Space", "Play or pause"),
     ("Right / Left", "Seek 5 s forward, 2 s back"),
     ("Up / Down", "Volume"),
     ("Delete", "Stop and move the file to the trash"),
 )
+
+
+# -- File Control (renaming: tidy names, playlist names, word lists) ----------------
+FC_CAPTION = "Rename playlists and tidy file names · see every change first · undo any time"
+FC_CARD_TARGET = "Rename in"
+FC_ONE_PLAYLIST = "One playlist"
+FC_PLAYLIST = "Playlist"
+FC_PLAYLIST_NAME = "Name"
+FC_RENAME_GO = "Rename"
+FC_RENAMED = "Renamed to {name}"
+FC_NO_PLAYLISTS = "No playlists yet: download one, or rename across All files"
+FC_CARD_FILLER = "Filler words"
+FC_REPLACEMENTS_NOTE = 'Used by "Apply replacements": each "from" becomes its "to"'
+FC_PREVIEW_TITLE = "Preview"
+FC_PICK_OPERATION = "Pick a change on the left to see every name it would change"
+FC_PREVIEW_MORE = "… and {n} more"
+FC_TO_TRASH = "moved to the trash"
+FC_APPLY_NONE = "Nothing to change"
+LIB_RENAME_FILES = "Rename files"
+
+# -- Library: search, filter, tick and delete -----------------------------------
+LIB_SEARCH_FILES = "Search names"
+LIB_FILTER_NAME = "Show"
+LIB_FILTER_ALL = "All files"
+LIB_FILTER_AUDIO = "Audio only"
+LIB_FILTER_VIDEO = "Video only"
+LIB_FILTER_LONG = "Over {n} min"
+LIB_FILTER_ALIKE = "Same size"
+LIB_FILTER_NONE = "No files match the search or filter"
+LIB_SELECT_ALL = "Select all"
+LIB_CHECK_FILE = "Select {name}"
+LIB_CHECKED = "{k} of {n} selected"
+LIB_DELETE_NONE = "Delete"
+LIB_DELETE_K = "Delete {k}"
+LIB_DELETE_HOW = "Tick files to delete them"
+LIB_DELETE_TITLE = "Move {k} files to the trash?"
+LIB_DELETE_BODY = "Each goes to its playlist's trash. Empty the trash to delete them for good."
+LIB_DELETE_GO = "Move {k} to trash"
+LIB_DELETE_KEEP = "Keep them"
+
+# -- queueing several links ------------------------------------------------------
+QUEUE_NOTE_MANY = "Runs after this one, in order. Paste several links at once to queue them all"
+QUEUED_LINKS = "Queued {n} links · they download one after another"
+QUEUE_REMOVE = "Remove {title} from the queue"
+QUEUE_UP_NEXT = "Up next"
+
+# -- panel icon -------------------------------------------------------------------
+TRAY_SHOW = "Show LinMediaDownloader"
+TRAY_HIDE = "Hide window"
+TRAY_QUIT = "Quit"
+TRAY_IDLE = "Ready"
+TRAY_HIDDEN_TITLE = "Still downloading"
+TRAY_HIDDEN_BODY = "LinMediaDownloader keeps going in the panel. Click its icon to open the window."
